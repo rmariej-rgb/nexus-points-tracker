@@ -49,15 +49,18 @@ workflows:
           set -e
           echo "===== 1. initialize keychain ====="
           keychain initialize
-          echo "===== 2. fetch/create signing files for $BUNDLE_ID ====="
-          # Our own private key (CERTIFICATE_PRIVATE_KEY env var) is paired with the
-          # distribution certificate, so the fresh build machine has a usable signing
-          # identity. --create makes the certificate + App Store profile if missing,
-          # and reuses them on every later build.
+          echo "===== 2. decode the private key (stored base64 to survive pasting) ====="
+          # CERTIFICATE_PRIVATE_KEY holds the PEM key base64-encoded on a single line,
+          # so line breaks can't get mangled by the Codemagic UI. Decode it to a file.
+          echo "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > /tmp/cert_key.pem
+          echo "===== 3. fetch/create signing files for $BUNDLE_ID ====="
+          # The decoded private key is paired with the distribution certificate, so the
+          # fresh build machine has a usable signing identity. --create makes the
+          # certificate + App Store profile if missing, and reuses them on later builds.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --platform IOS \
-            --certificate-key @env:CERTIFICATE_PRIVATE_KEY \
+            --certificate-key @file:/tmp/cert_key.pem \
             --create
           echo "===== 3. add certificates to keychain ====="
           keychain add-certificates
