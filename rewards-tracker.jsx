@@ -587,6 +587,32 @@ function cardValue(card, cat) {
   return rateFor(card, cat) * (REWARDS_CPP[card.rewards] ?? DEFAULT_CPP);
 }
 
+/* ————— Add-to-calendar (Google Calendar link + .ics — no account connection) ————— */
+function ymd(d) {
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
+// Builds a Google Calendar "add event" link and an .ics data URI for an all-day
+// reminder on `date`, with a 30-day-ahead alarm baked into the .ics.
+function calendarLinks(title, details, date) {
+  if (!date) return null;
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const end = new Date(start); end.setDate(end.getDate() + 1);
+  const s = ymd(start), e = ymd(end);
+  const clean = (x) => String(x || "").replace(/[\r\n]+/g, " ");
+  const google = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(clean(title))}&dates=${s}/${e}&details=${encodeURIComponent(clean(details))}`;
+  const now = new Date();
+  const stamp = `${ymd(now)}T090000Z`;
+  const uid = `nexus-${s}-${Math.abs(String(title).split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7))}@nexusrewards`;
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nexus//Rewards//EN", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT", `UID:${uid}`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${s}`, `DTEND;VALUE=DATE:${e}`,
+    `SUMMARY:${clean(title)}`, `DESCRIPTION:${clean(details)}`,
+    "BEGIN:VALARM", "TRIGGER:-P30D", "ACTION:DISPLAY", `DESCRIPTION:${clean(title)}`, "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  return { google, icsUri: "data:text/calendar;charset=utf-8," + encodeURIComponent(ics) };
+}
+
 // Next occurrence of a card's annual-fee date (1st of its renewal month).
 function nextFeeDate(annualMonth, from = new Date()) {
   if (annualMonth === undefined || annualMonth === null) return null;
@@ -1028,15 +1054,20 @@ export default function RewardsTracker() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {annualFees.filter((af) => af.daysLeft !== null && af.daysLeft <= REMIND_DAYS).map((af) => (
-                    <div key={af.card.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{af.card.name}</span>
-                        <span className="rt-mono" style={{ fontSize: 11, color: T.sub, marginLeft: 8 }}>{money(af.card.fee)}</span>
+                    <div key={af.card.id} style={{ display: "grid", gap: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 14 }}>{af.card.displayName || af.card.name}</span>
+                          <span className="rt-mono" style={{ fontSize: 11, color: T.sub, marginLeft: 8 }}>{money(af.card.fee)}</span>
+                        </div>
+                        <div className="rt-mono" style={{ textAlign: "right", fontSize: 12, color: af.daysLeft <= 14 ? T.red : T.amber }}>
+                          <div style={{ fontWeight: 600 }}>{fmtDate(af.dueDate)}</div>
+                          <div style={{ fontSize: 10, color: af.daysLeft <= 14 ? T.red : T.amber }}>{af.daysLeft}d</div>
+                        </div>
                       </div>
-                      <div className="rt-mono" style={{ textAlign: "right", fontSize: 12, color: af.daysLeft <= 14 ? T.red : T.amber }}>
-                        <div style={{ fontWeight: 600 }}>{fmtDate(af.dueDate)}</div>
-                        <div style={{ fontSize: 10, color: af.daysLeft <= 14 ? T.red : T.amber }}>{af.daysLeft}d</div>
-                      </div>
+                      <AddToCalendar T={T} compact date={af.dueDate}
+                        title={`${af.card.displayName || af.card.name} annual fee — ${money(af.card.fee)}`}
+                        details={`Nexus reminder: your ${money(af.card.fee)} annual fee posts around ${fmtDate(af.dueDate)}. Decide whether to keep, downgrade, or cancel.`} />
                     </div>
                   ))}
                 </div>
@@ -1334,6 +1365,24 @@ export default function RewardsTracker() {
   );
 }
 
+/* ————— Add-to-calendar button (opens Google Calendar; .ics for Apple/Outlook) ————— */
+function AddToCalendar({ T, title, details, date, compact }) {
+  const links = calendarLinks(title, details, date);
+  if (!links) return null;
+  const open = (url) => { try { window.open(url, "_system"); } catch (e) { try { window.open(url, "_blank"); } catch (_) { window.location.href = url; } } };
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <button onClick={() => open(links.google)} className="rt-mono"
+        style={{ background: "none", border: `1px solid ${T.borderSoft}`, borderRadius: 999, color: T.text,
+          fontSize: compact ? 10 : 11, letterSpacing: .5, padding: compact ? "3px 10px" : "5px 12px", cursor: "pointer" }}>
+        ＋ add to calendar
+      </button>
+      <a href={links.icsUri} download="nexus-reminder.ics" className="rt-mono"
+        style={{ fontSize: compact ? 10 : 11, color: T.sub, textDecoration: "underline" }}>Apple / .ics</a>
+    </div>
+  );
+}
+
 /* ————— Toggle switch ————— */
 function Toggle({ T, on, onChange, label }) {
   return (
@@ -1491,6 +1540,13 @@ function CardDetailPanel({ T, card, benefits, onClose }) {
         <span>ANNUAL FEE <strong style={{ color: T.text }}>{money(card.fee)}</strong></span>
         <span>FEE POSTS <strong style={{ color: T.text }}>{card.annualMonth != null ? MONTHS[card.annualMonth] : "—"}</strong></span>
       </div>
+      {card.fee > 0 && card.annualMonth != null && (
+        <div style={{ marginTop: 10 }}>
+          <AddToCalendar T={T} date={nextFeeDate(card.annualMonth)}
+            title={`${card.displayName || card.name} annual fee — ${money(card.fee)}`}
+            details={`Nexus reminder: your ${money(card.fee)} annual fee posts around ${fmtDate(nextFeeDate(card.annualMonth))}. Decide whether to keep, downgrade, or cancel.`} />
+        </div>
+      )}
 
       {earnList.length > 0 && (
         <>
@@ -1610,6 +1666,14 @@ function EditPanel({ T, benefit, usageMap, onSetPeriod, onSave, onUsed, onSetAut
             onChange={(e) => { const v = Math.min(Number(e.target.value) || 0, amount); setPartial(v); onUsed(v); }} /></div>
       </div>
       <div><label className="rt-mono" style={lbl}>NOTES</label><input style={inp} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      {amount > 0 && freq !== "multiyear" && benefit.end && (
+        <div>
+          <label className="rt-mono" style={lbl}>REMIND ME ON MY CALENDAR</label>
+          <AddToCalendar T={T} date={benefit.end}
+            title={`Use ${money(amount)} ${name}`}
+            details={`Nexus: use your ${money(amount)} ${name} before it resets on ${fmtDate(benefit.end)}.${notes ? " " + notes : ""}`} />
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button onClick={onDelete} style={{ background: "none", border: "none", color: T.red, fontSize: 12, textDecoration: "underline" }}>Delete benefit</button>
         <button onClick={() => onSave({ name, amount, freq, notes })}
