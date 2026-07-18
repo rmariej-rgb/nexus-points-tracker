@@ -61,38 +61,8 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 /* ————— Cards (earn = where this card beats the others in your wallet) ————— */
 // annualMonth is 0-indexed (0 = January). These are placeholders — set each
 // card's real renewal month in "Manage cards" so reminders fire on time.
-const CARDS = [
-  // Colors chosen to resemble each card's real-life design.
-  // earnDetails = full list of earning categories, shown on the card details view.
-  { id: "gold", name: "Amex Gold", issuer: "American Express", fee: 325, annualMonth: 4,
-    earn: "4x DINING · 4x U.S. SUPERMARKETS",
-    earnDetails: ["4x Dining worldwide", "4x U.S. supermarkets (up to $25k/yr)", "3x Flights booked direct or via Amex Travel", "1x Everything else"],
-    bg: "linear-gradient(135deg,#E7D8A6 0%,#CBA85C 45%,#A6832F 100%)", ink: "#3A2E10", accent: "#A6832F" }, // gold
-  { id: "plat", name: "Amex Platinum", issuer: "American Express", fee: 895, annualMonth: 0,
-    earn: "5x FLIGHTS (AIRLINE DIRECT / AMEX TRAVEL)",
-    earnDetails: ["5x Flights booked direct or via Amex Travel (up to $500k/yr)", "5x Prepaid hotels via Amex Travel", "1x Everything else"],
-    bg: "linear-gradient(135deg,#EDEFF2 0%,#C9CDD3 50%,#A7ACB4 100%)", ink: "#2A2D33", accent: "#8A9099" }, // platinum silver
-  { id: "csp", name: "Sapphire Preferred", issuer: "Chase", fee: 95, annualMonth: 10,
-    earn: "3x DINING · GAS · VACATION RENTALS",
-    earnDetails: ["5x Chase Travel", "3x Dining", "3x Online groceries", "3x Select streaming", "2x All other travel", "1x Everything else"],
-    bg: "linear-gradient(135deg,#3A66B0 0%,#284E8E 55%,#183463 100%)", ink: "#EAF0FA", accent: "#3A66B0" }, // sapphire blue
-  { id: "cibp", name: "Ink Business Preferred", issuer: "Chase", fee: 95, annualMonth: 7,
-    earn: "3x TRAVEL · SHIPPING · ADS · INTERNET",
-    earnDetails: ["3x Travel", "3x Shipping", "3x Internet, cable & phone", "3x Advertising (search & social)", "3x applies to first $150k/yr combined", "1x Everything else"],
-    bg: "linear-gradient(135deg,#1E3352 0%,#152740 55%,#0D1A2E 100%)", ink: "#D6DEEA", accent: "#29456F" }, // ink navy
-  { id: "citi-exec", name: "AAdvantage Executive World Elite", issuer: "Citi / American Airlines", fee: 595, annualMonth: 2,
-    earn: "4x AMERICAN AIRLINES PURCHASES",
-    earnDetails: ["4x American Airlines purchases", "1x Everything else"],
-    bg: "linear-gradient(135deg,#45494F 0%,#2C2F34 55%,#1B1D21 100%)", ink: "#E7E9EC", accent: "#B4232A" }, // dark metal, AA red
-  { id: "citi-plat", name: "AAdvantage Platinum Select World Elite", issuer: "Citi / American Airlines", fee: 99, annualMonth: 6,
-    earn: "2x AMERICAN AIRLINES · RESTAURANTS · GAS",
-    earnDetails: ["2x American Airlines purchases", "2x Restaurants", "2x Gas stations", "1x Everything else"],
-    bg: "linear-gradient(135deg,#9BA7B5 0%,#6F7D8D 50%,#4D5866 100%)", ink: "#1B2430", accent: "#46607E" }, // steel silver-blue
-  { id: "cap-venture", name: "Venture Rewards", issuer: "Capital One", fee: 95, annualMonth: 5,
-    earn: "2x ALL PURCHASES (unlimited)",
-    earnDetails: ["5x Hotels & rental cars booked via Capital One Travel", "2x Miles on every other purchase"],
-    bg: "linear-gradient(135deg,#26406B 0%,#1A2F52 55%,#101F38 100%)", ink: "#EAF0F8", accent: "#C8102E" }, // navy, Capital One red
-];
+// The wallet starts empty on first launch — cards are added from CARD_CATALOG.
+const CARDS = [];
 
 /* ————— Catalog of add-able travel cards (grouped by issuer) —————
    Fees, earning rates, and credits reflect published terms as of mid-2026 and are
@@ -128,7 +98,50 @@ const CAT_COLORS = {
 };
 const GE = { name: "Global Entry / TSA PreCheck credit", amount: 120, freq: "multiyear", notes: "Reimbursed once every ~4 years." };
 const CARD_CATALOG = [
-  { group: "Chase · Personal travel", items: [
+  { group: "Amex Membership Rewards", items: [
+    { name: "Amex Gold", issuer: "American Express", fee: 325, earn: "4x DINING · 4x U.S. SUPERMARKETS",
+      earnDetails: ["4x Dining worldwide", "4x U.S. supermarkets (up to $25k/yr)", "3x Flights booked direct or via Amex Travel", "1x Everything else"], ...CAT_COLORS.amexGold,
+      benefits: [
+        { name: "Dining credit (Grubhub, Five Guys, Cheesecake Factory, Wonder…)", amount: 10, freq: "monthly", notes: "Enrollment required." },
+        { name: "Uber Cash", amount: 10, freq: "monthly", notes: "Add card to Uber wallet; expires monthly." },
+        { name: "Dunkin' credit", amount: 7, freq: "monthly", notes: "U.S. Dunkin' locations. Enrollment required." },
+        { name: "Resy dining credit", amount: 50, freq: "semiannual", notes: "$50 Jan–Jun and $50 Jul–Dec at U.S. Resy restaurants." },
+      ] },
+    { name: "Amex Platinum", issuer: "American Express", fee: 895, earn: "5x FLIGHTS (AIRLINE DIRECT / AMEX TRAVEL)",
+      earnDetails: ["5x Flights booked direct or via Amex Travel (up to $500k/yr)", "5x Prepaid hotels via Amex Travel", "1x Everything else"], ...CAT_COLORS.amexPlat,
+      benefits: [
+        { name: "Airline incidental fee credit", amount: 200, freq: "annual", notes: "Select one airline; covers incidentals like bags & seat fees." },
+        { name: "Uber Cash", amount: 15, freq: "monthly", notes: "$15/mo + $20 bonus in December." },
+        { name: "Uber One membership credit", amount: 120, freq: "annual" },
+        { name: "Hotel credit (FHR / Hotel Collection)", amount: 300, freq: "semiannual", notes: "Prepaid Amex Travel bookings; THC needs a 2-night min." },
+        { name: "Resy dining credit", amount: 100, freq: "quarterly", notes: "U.S. Resy partner restaurants; enrollment required." },
+        { name: "Digital entertainment credit", amount: 25, freq: "monthly", notes: "Eligible subscriptions (Peacock, Audible, NYT…)." },
+        { name: "lululemon credit", amount: 75, freq: "quarterly", notes: "U.S. lululemon purchases; enrollment required." },
+        { name: "Walmart+ membership credit", amount: 13, freq: "monthly" },
+        { name: "CLEAR Plus credit", amount: 209, freq: "annual" },
+        { ...GE },
+      ] },
+    { name: "Amex Green", issuer: "American Express", fee: 150, earn: "3x TRAVEL · TRANSIT · DINING",
+      earnDetails: ["3x Travel", "3x Transit", "3x Dining worldwide", "1x Everything else"], ...CAT_COLORS.amexGreen,
+      benefits: [{ name: "CLEAR Plus credit", amount: 199, freq: "annual" }] },
+    { name: "Business Platinum", issuer: "American Express", fee: 895, earn: "5x FLIGHTS & PREPAID HOTELS (AMEX TRAVEL) · 1.5x LARGE PURCHASES",
+      earnDetails: ["5x Flights & prepaid hotels via Amex Travel", "1.5x on purchases of $5,000+ (up to $2M/yr)", "1x Everything else"], ...CAT_COLORS.amexPlat,
+      benefits: [
+        { name: "Airline fee credit", amount: 200, freq: "annual" },
+        { name: "Dell Technologies credit", amount: 400, freq: "semiannual", notes: "$200 Jan–Jun and Jul–Dec on U.S. Dell purchases." },
+        { name: "Indeed credit", amount: 360, freq: "quarterly", notes: "$90 per quarter on Indeed." },
+        { name: "Wireless credit", amount: 120, freq: "monthly", notes: "$10/mo on U.S. wireless carriers." },
+        { name: "Adobe credit", amount: 150, freq: "annual" },
+        { ...GE }, { name: "Centurion + Priority Pass lounge access", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Business Gold", issuer: "American Express", fee: 375, earn: "4x TOP 2 CATEGORIES · 1x ELSE",
+      earnDetails: ["4x on your 2 top eligible categories each month (up to $150k/yr)", "1x Everything else"], ...CAT_COLORS.amexGold,
+      benefits: [
+        { name: "Flexible Business credit", amount: 240, freq: "monthly", notes: "$20/mo across FedEx, Grubhub & office-supply stores." },
+        { name: "Walmart+ membership credit", amount: 155, freq: "monthly", notes: "$12.95/mo covers a Walmart+ plan." },
+      ] },
+  ] },
+  { group: "Chase Ultimate Rewards", items: [
     { name: "Sapphire Reserve", issuer: "Chase", fee: 795, earn: "8x CHASE TRAVEL · 4x FLIGHTS & HOTELS · 3x DINING",
       earnDetails: ["8x Chase Travel", "4x Flights & hotels booked direct", "3x Dining", "1x Everything else"], ...CAT_COLORS.chaseBlue,
       benefits: [
@@ -136,114 +149,101 @@ const CARD_CATALOG = [
         { name: "The Edit hotel credit", amount: 250, freq: "semiannual", notes: "$250 Jan–Jun and Jul–Dec on prepaid The Edit stays (2+ nights)." },
         { name: "StubHub / viagogo credit", amount: 150, freq: "semiannual", notes: "$150 Jan–Jun and Jul–Dec." },
         { name: "DoorDash credits", amount: 5, freq: "monthly", notes: "Restaurant + retail promos with activated DashPass." },
-        { ...GE }, { name: "Priority Pass Select lounge access", amount: 0, freq: "multiyear" },
+        { ...GE, name: "Global Entry / TSA PreCheck / NEXUS credit" }, { name: "Priority Pass Select lounge access", amount: 0, freq: "multiyear" },
       ] },
-    { name: "United Explorer", issuer: "Chase / United", fee: 150, earn: "2x UNITED · DINING · HOTELS",
-      earnDetails: ["2x United purchases", "2x Dining", "2x Hotel stays", "1x Everything else"], ...CAT_COLORS.united,
+    { name: "Sapphire Preferred", issuer: "Chase", fee: 95, earn: "3x DINING · GAS · VACATION RENTALS",
+      earnDetails: ["5x Chase Travel", "3x Dining", "3x Online groceries", "3x Select streaming", "2x All other travel", "1x Everything else"], ...CAT_COLORS.chaseBlue,
       benefits: [
-        { name: "First checked bag free (you + companion)", amount: 0, freq: "multiyear" },
-        { name: "United Club one-time passes (2/yr)", amount: 0, freq: "annual" },
-        { ...GE },
+        { name: "Chase Travel hotel credit", amount: 100, freq: "annual", notes: "Hotel credit via Chase Travel; resets each account anniversary — adjust timing to yours." },
+        { name: "DoorDash non-restaurant promo", amount: 10, freq: "monthly", notes: "Requires activated DashPass." },
+        { name: "Apple TV — 1 year free", amount: 13, freq: "monthly", notes: "Activate by the deadline." },
+        { ...GE, name: "Global Entry / TSA PreCheck / NEXUS credit" },
       ] },
-    { name: "United Quest", issuer: "Chase / United", fee: 350, earn: "3x UNITED · 2x TRAVEL & DINING",
-      earnDetails: ["3x United purchases", "2x Other travel", "2x Dining & streaming", "1x Everything else"], ...CAT_COLORS.united,
-      benefits: [
-        { name: "United travel credit", amount: 200, freq: "annual", notes: "Rideshare + United credits per current terms." },
-        { name: "First & second checked bags free", amount: 0, freq: "multiyear" },
-        { ...GE },
-      ] },
-    { name: "United Club Infinite", issuer: "Chase / United", fee: 525, earn: "4x UNITED · 2x TRAVEL & DINING",
-      earnDetails: ["4x United purchases", "2x Other travel", "2x Dining", "1x Everything else"], ...CAT_COLORS.united,
-      benefits: [
-        { name: "United Club membership", amount: 0, freq: "multiyear" },
-        { name: "Two checked bags free", amount: 0, freq: "multiyear" },
-        { ...GE },
-      ] },
-    { name: "United Gateway", issuer: "Chase / United", fee: 0, earn: "2x UNITED · GAS · TRANSIT",
-      earnDetails: ["2x United purchases", "2x Gas stations", "2x Local transit", "1x Everything else"], ...CAT_COLORS.united, benefits: [] },
-    { name: "Southwest Rapid Rewards Priority", issuer: "Chase / Southwest", fee: 149, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
-      earnDetails: ["3x Southwest purchases", "2x Local transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
-      benefits: [
-        { name: "Annual Southwest travel credit", amount: 75, freq: "annual" },
-        { name: "Upgraded boardings (4/yr)", amount: 0, freq: "annual" },
-        { name: "Anniversary points (7,500)", amount: 0, freq: "annual" },
-      ] },
-    { name: "Southwest Rapid Rewards Premier", issuer: "Chase / Southwest", fee: 99, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
-      earnDetails: ["3x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
-      benefits: [{ name: "Anniversary points (6,000)", amount: 0, freq: "annual" }] },
-    { name: "Southwest Rapid Rewards Plus", issuer: "Chase / Southwest", fee: 69, earn: "2x SOUTHWEST · 2x TRANSIT & DINING",
-      earnDetails: ["2x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
-      benefits: [{ name: "Anniversary points (3,000)", amount: 0, freq: "annual" }] },
-    { name: "IHG One Rewards Premier", issuer: "Chase / IHG", fee: 99, earn: "10x IHG · 5x TRAVEL / DINING / GAS",
-      earnDetails: ["10x IHG stays", "5x Travel, dining & gas", "3x Everything else"], ...CAT_COLORS.ihg,
-      benefits: [
-        { name: "Anniversary free night (40k)", amount: 0, freq: "annual" },
-        { name: "Platinum Elite status", amount: 0, freq: "multiyear" },
-        { ...GE },
-      ] },
-    { name: "Marriott Bonvoy Boundless", issuer: "Chase / Marriott", fee: 95, earn: "6x MARRIOTT · 3x GROCERY / GAS / DINING",
-      earnDetails: ["6x Marriott stays", "3x Grocery, gas & dining (on first $6k/yr)", "2x Everything else"], ...CAT_COLORS.marriott,
-      benefits: [
-        { name: "Anniversary free night (35k)", amount: 0, freq: "annual" },
-        { name: "Silver Elite status", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "World of Hyatt", issuer: "Chase / Hyatt", fee: 95, earn: "4x HYATT · 2x DINING / FLIGHTS / TRANSIT / FITNESS",
-      earnDetails: ["4x Hyatt stays", "2x Dining, flights, transit & fitness", "1x Everything else"], ...CAT_COLORS.hyatt,
-      benefits: [
-        { name: "Anniversary free night (Cat 1–4)", amount: 0, freq: "annual" },
-        { name: "Discoverist status", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Aeroplan (Air Canada)", issuer: "Chase / Air Canada", fee: 95, earn: "3x AIR CANADA · 3x DINING & GROCERY",
-      earnDetails: ["3x Air Canada / Aeroplan", "3x Dining & groceries", "1x Everything else"], ...CAT_COLORS.aeroplan,
-      benefits: [
-        { name: "First checked bag free (Air Canada)", amount: 0, freq: "multiyear" },
-        { ...GE },
-      ] },
-    { name: "British Airways Visa Signature", issuer: "Chase / British Airways", fee: 95, earn: "3x BRITISH AIRWAYS · 2x TRAVEL",
-      earnDetails: ["3x British Airways / Aer Lingus / Iberia", "2x Hotel & other travel", "1x Everything else"], ...CAT_COLORS.britishair,
-      benefits: [{ name: "Travel Together companion ticket after spend", amount: 0, freq: "annual" }] },
-  ] },
-  { group: "Chase · Business travel", items: [
     { name: "Sapphire Reserve for Business", issuer: "Chase", fee: 795, earn: "8x CHASE TRAVEL · 5x LYFT · 4x SOCIAL/SEARCH ADS",
       earnDetails: ["8x Chase Travel", "5x Lyft", "4x Social media & search advertising", "3x Dining & travel", "1x Everything else"], ...CAT_COLORS.chaseBlue,
       benefits: [
         { name: "Annual travel credit", amount: 300, freq: "annual" },
         { name: "The Edit hotel credit", amount: 250, freq: "semiannual", notes: "$250 Jan–Jun and Jul–Dec on prepaid The Edit stays." },
-        { ...GE }, { name: "Priority Pass Select lounge access", amount: 0, freq: "multiyear" },
+        { ...GE, name: "Global Entry / TSA PreCheck / NEXUS credit" }, { name: "Priority Pass Select lounge access", amount: 0, freq: "multiyear" },
       ] },
+    { name: "Ink Business Preferred", issuer: "Chase", fee: 95, earn: "3x TRAVEL · SHIPPING · ADS · INTERNET",
+      earnDetails: ["3x Travel", "3x Shipping", "3x Internet, cable & phone", "3x Advertising (search & social)", "3x on first $150k/yr combined", "1x Everything else"], ...CAT_COLORS.chaseNavy,
+      benefits: [{ name: "Cell phone protection", amount: 0, freq: "multiyear", notes: "Pay your phone bill with the card for up to $1,000/claim coverage." }] },
     { name: "Ink Business Cash", issuer: "Chase", fee: 0, earn: "5x OFFICE SUPPLY / INTERNET / PHONE · 2x GAS & DINING",
       earnDetails: ["5x Office supply, internet, cable & phone (first $25k/yr)", "2x Gas & dining (first $25k/yr)", "1x Everything else"], ...CAT_COLORS.chaseNavy, benefits: [] },
     { name: "Ink Business Unlimited", issuer: "Chase", fee: 0, earn: "1.5x EVERY PURCHASE",
       earnDetails: ["1.5x Unlimited on all purchases"], ...CAT_COLORS.chaseNavy, benefits: [] },
     { name: "Ink Business Premier", issuer: "Chase", fee: 195, earn: "2.5% ON $5K+ PURCHASES · 5x TRAVEL",
       earnDetails: ["5x Travel via Chase", "2.5% on purchases of $5,000+", "2% on everything else"], ...CAT_COLORS.chaseNavy, benefits: [] },
-    { name: "United Business", issuer: "Chase / United", fee: 99, earn: "2x UNITED · DINING / GAS / OFFICE / TRANSIT",
-      earnDetails: ["2x United purchases", "2x Dining, gas, office supply & transit", "1x Everything else"], ...CAT_COLORS.united,
+  ] },
+  { group: "Capital One Miles", items: [
+    { name: "Venture Rewards", issuer: "Capital One", fee: 95, earn: "2x ALL PURCHASES (unlimited)",
+      earnDetails: ["5x Hotels & rental cars booked via Capital One Travel", "2x Miles on every other purchase"], ...CAT_COLORS.capNavy,
+      benefits: [{ ...GE, notes: "Once every ~4 years. Capital One reimburses the fee." }] },
+    { name: "Venture X", issuer: "Capital One", fee: 395, earn: "10x HOTELS & CARS (CAP ONE TRAVEL) · 5x FLIGHTS · 2x ELSE",
+      earnDetails: ["10x Hotels & rental cars via Capital One Travel", "5x Flights & vacation rentals via Capital One Travel", "2x Everything else"], ...CAT_COLORS.capDark,
+      benefits: [
+        { name: "Annual travel credit (Capital One Travel)", amount: 300, freq: "annual" },
+        { name: "Anniversary bonus miles", amount: 100, freq: "annual", notes: "10,000 miles (~$100) each anniversary." },
+        { ...GE }, { name: "Priority Pass + Capital One Lounge access", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "VentureOne Rewards", issuer: "Capital One", fee: 0, earn: "1.25x EVERYTHING · 5x TRAVEL (PORTAL)",
+      earnDetails: ["5x Hotels & rental cars via Capital One Travel", "1.25x Miles on every purchase"], ...CAT_COLORS.capNavy, benefits: [] },
+    { name: "Venture X Business", issuer: "Capital One", fee: 395, earn: "10x HOTELS & CARS (PORTAL) · 5x FLIGHTS · 2x ELSE",
+      earnDetails: ["10x Hotels & rental cars via Capital One Travel", "5x Flights via Capital One Travel", "2x Everything else"], ...CAT_COLORS.capDark,
+      benefits: [
+        { name: "Annual travel credit (Capital One Travel)", amount: 300, freq: "annual" },
+        { name: "Anniversary bonus miles", amount: 100, freq: "annual", notes: "10,000 miles (~$100) each anniversary." },
+        { ...GE }, { name: "Priority Pass + Capital One Lounge access", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Spark Miles (Business)", issuer: "Capital One", fee: 95, earn: "2x EVERYTHING · 5x TRAVEL (PORTAL)",
+      earnDetails: ["5x Hotels & rental cars via Capital One Travel", "2x Miles on every purchase"], ...CAT_COLORS.capNavy,
+      benefits: [{ ...GE }] },
+  ] },
+  { group: "Citi ThankYou Points", items: [
+    { name: "Citi Strata Elite", issuer: "Citi", fee: 595, earn: "12x CITI TRAVEL HOTELS/CARS · 6x RESTAURANTS (weekends) · 1.5x ELSE",
+      earnDetails: ["12x Hotels, car rentals & attractions via Citi Travel", "6x Restaurants (Fri–Sun)", "3x Restaurants (other days)", "1.5x Everything else"], ...CAT_COLORS.citiDark,
+      benefits: [
+        { name: "Annual hotel benefit (Citi Travel)", amount: 300, freq: "annual", notes: "$300 off a single hotel stay booked via Citi Travel." },
+        { name: "Splurge credit", amount: 200, freq: "annual", notes: "$200 across select partners (American Airlines, Live Nation, 1stDibs…)." },
+        { ...GE }, { name: "Lounge access (Admirals Club day passes + Priority Pass)", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Citi Strata Premier", issuer: "Citi", fee: 95, earn: "10x CITI TRAVEL · 3x AIR / DINING / GROCERY / GAS / EV",
+      earnDetails: ["10x Hotels, car rentals & attractions via Citi Travel", "3x Air travel, dining, supermarkets, gas & EV charging", "1x Everything else"], ...CAT_COLORS.citiLight,
+      benefits: [{ name: "Annual hotel credit", amount: 100, freq: "annual", notes: "$100 off a single $500+ hotel stay via Citi Travel." }] },
+  ] },
+  { group: "American Airlines AAdvantage", items: [
+    { name: "AAdvantage Executive World Elite", issuer: "Citi / American Airlines", fee: 595, earn: "4x AMERICAN AIRLINES PURCHASES",
+      earnDetails: ["4x American Airlines purchases", "1x Everything else"], ...CAT_COLORS.aaGraphite,
+      benefits: [
+        { name: "Admirals Club membership", amount: 0, freq: "multiyear", notes: "Full membership + 2 guests." },
+        { name: "Avis / Budget rental credit", amount: 120, freq: "annual", notes: "On eligible prepaid rentals." },
+        { name: "Lyft credit", amount: 10, freq: "monthly", notes: "$10 back after 3 eligible rides each month." },
+        { name: "Grubhub credit", amount: 10, freq: "monthly" },
+        { ...GE },
+      ] },
+    { name: "AAdvantage Platinum Select World Elite", issuer: "Citi / American Airlines", fee: 99, earn: "2x AMERICAN AIRLINES · RESTAURANTS · GAS",
+      earnDetails: ["2x American Airlines purchases", "2x Restaurants", "2x Gas stations", "1x Everything else"], ...CAT_COLORS.citiLight,
+      benefits: [
+        { name: "Free checked bag (+ up to 4 guests)", amount: 0, freq: "multiyear", notes: "Domestic AA flights." },
+        { name: "$125 AA flight discount", amount: 125, freq: "annual", notes: "Earned after $20k spend during the membership year." },
+      ] },
+    { name: "Citi AAdvantage MileUp", issuer: "Citi / American Airlines", fee: 0, earn: "2x AA · GROCERY",
+      earnDetails: ["2x American Airlines purchases", "2x U.S. supermarkets", "1x Everything else"], ...CAT_COLORS.citiLight, benefits: [] },
+    { name: "Citi / AAdvantage Business", issuer: "Citi / American Airlines", fee: 99, earn: "2x AA · TELECOM / CAR RENTAL / GAS",
+      earnDetails: ["2x American Airlines purchases", "2x Telecom, cable, car rental & gas", "1x Everything else"], ...CAT_COLORS.aaGraphite,
       benefits: [
         { name: "First checked bag free", amount: 0, freq: "multiyear" },
-        { name: "United travel credit", amount: 100, freq: "annual", notes: "$100 United credit after 7+ purchases each month? — verify." },
+        { name: "Companion certificate after $30k spend", amount: 0, freq: "annual" },
       ] },
-    { name: "Southwest Business Premier", issuer: "Chase / Southwest", fee: 99, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
-      earnDetails: ["3x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
-      benefits: [{ name: "Anniversary points (6,000)", amount: 0, freq: "annual" }] },
-    { name: "Southwest Business Performance", issuer: "Chase / Southwest", fee: 199, earn: "4x SOUTHWEST · 3x RIDESHARE · 2x SOCIAL ADS/INTERNET/PHONE",
-      earnDetails: ["4x Southwest purchases", "3x Rideshare", "2x Social media ads, internet, cable & phone", "1x Everything else"], ...CAT_COLORS.southwest,
+    { name: "AAdvantage Aviator Red", issuer: "Barclays / American Airlines", fee: 99, earn: "2x AMERICAN AIRLINES",
+      earnDetails: ["2x American Airlines purchases", "1x Everything else"], ...CAT_COLORS.aaGraphite,
       benefits: [
-        { name: "Upgraded boardings (4/yr)", amount: 0, freq: "annual" },
-        { name: "Inflight Wi-Fi credits (365/yr)", amount: 0, freq: "annual" },
-        { name: "Anniversary points (9,000)", amount: 0, freq: "annual" },
-      ] },
-    { name: "World of Hyatt Business", issuer: "Chase / Hyatt", fee: 199, earn: "4x HYATT · 2x TOP 3 SPEND CATEGORIES",
-      earnDetails: ["4x Hyatt stays", "2x on your top 3 eligible spend categories", "1x Everything else"], ...CAT_COLORS.hyatt,
-      benefits: [
-        { name: "Hyatt statement credits", amount: 100, freq: "semiannual", notes: "$50 twice a year on Hyatt spend." },
-        { name: "Discoverist status", amount: 0, freq: "multiyear" },
+        { name: "First checked bag free", amount: 0, freq: "multiyear" },
+        { name: "Companion certificate after spend", amount: 0, freq: "annual" },
       ] },
   ] },
-  { group: "Amex · Personal travel", items: [
-    { name: "Amex Green", issuer: "American Express", fee: 150, earn: "3x TRAVEL · TRANSIT · DINING",
-      earnDetails: ["3x Travel", "3x Transit", "3x Dining worldwide", "1x Everything else"], ...CAT_COLORS.amexGreen,
-      benefits: [{ name: "CLEAR Plus credit", amount: 199, freq: "annual" }] },
+  { group: "Delta SkyMiles", items: [
     { name: "Delta SkyMiles Gold", issuer: "Amex / Delta", fee: 150, earn: "2x DELTA · DINING · GROCERY",
       earnDetails: ["2x Delta purchases", "2x Dining worldwide", "2x U.S. supermarkets", "1x Everything else"], ...CAT_COLORS.delta,
       benefits: [
@@ -270,52 +270,6 @@ const CARD_CATALOG = [
       ] },
     { name: "Delta SkyMiles Blue", issuer: "Amex / Delta", fee: 0, earn: "2x DELTA · DINING",
       earnDetails: ["2x Delta purchases", "2x Dining worldwide", "1x Everything else"], ...CAT_COLORS.delta, benefits: [] },
-    { name: "Hilton Honors", issuer: "Amex / Hilton", fee: 0, earn: "7x HILTON · 5x DINING / GROCERY / GAS",
-      earnDetails: ["7x Hilton stays", "5x U.S. dining, supermarkets & gas", "3x Everything else"], ...CAT_COLORS.hilton, benefits: [] },
-    { name: "Hilton Honors Surpass", issuer: "Amex / Hilton", fee: 150, earn: "12x HILTON · 6x DINING / GROCERY / GAS",
-      earnDetails: ["12x Hilton stays", "6x U.S. dining, supermarkets & gas", "4x U.S. online retail", "3x Everything else"], ...CAT_COLORS.hilton,
-      benefits: [
-        { name: "Hilton credit", amount: 200, freq: "quarterly", notes: "$50 per quarter on Hilton purchases." },
-        { name: "Gold status", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Hilton Honors Aspire", issuer: "Amex / Hilton", fee: 550, earn: "14x HILTON · 7x FLIGHTS / CAR RENTAL / DINING",
-      earnDetails: ["14x Hilton stays", "7x Flights, car rentals & U.S. dining", "3x Everything else"], ...CAT_COLORS.hilton,
-      benefits: [
-        { name: "Hilton resort credit", amount: 400, freq: "semiannual", notes: "$200 Jan–Jun and Jul–Dec at Hilton resorts." },
-        { name: "Airline flight credit", amount: 200, freq: "quarterly", notes: "$50 per quarter on flights." },
-        { name: "CLEAR Plus credit", amount: 199, freq: "annual" },
-        { name: "Annual free night reward", amount: 0, freq: "annual" },
-        { name: "Diamond status", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Marriott Bonvoy Brilliant", issuer: "Amex / Marriott", fee: 650, earn: "6x MARRIOTT · 3x DINING & FLIGHTS",
-      earnDetails: ["6x Marriott stays", "3x Dining worldwide & flights booked direct", "2x Everything else"], ...CAT_COLORS.marriott,
-      benefits: [
-        { name: "Dining credit", amount: 300, freq: "monthly", notes: "$25/mo at restaurants worldwide." },
-        { name: "Annual free night (85k)", amount: 0, freq: "annual" },
-        { name: "Platinum Elite status", amount: 0, freq: "multiyear" },
-        { ...GE },
-      ] },
-    { name: "Marriott Bonvoy Bevy", issuer: "Amex / Marriott", fee: 250, earn: "6x MARRIOTT · 4x DINING & GROCERY",
-      earnDetails: ["6x Marriott stays", "4x Dining & U.S. supermarkets", "2x Everything else"], ...CAT_COLORS.marriott,
-      benefits: [{ name: "Gold Elite status", amount: 0, freq: "multiyear" }] },
-  ] },
-  { group: "Amex · Business travel", items: [
-    { name: "Business Platinum", issuer: "American Express", fee: 895, earn: "5x FLIGHTS & PREPAID HOTELS (AMEX TRAVEL) · 1.5x LARGE PURCHASES",
-      earnDetails: ["5x Flights & prepaid hotels via Amex Travel", "1.5x on purchases of $5,000+ (up to $2M/yr)", "1x Everything else"], ...CAT_COLORS.amexPlat,
-      benefits: [
-        { name: "Airline fee credit", amount: 200, freq: "annual" },
-        { name: "Dell Technologies credit", amount: 400, freq: "semiannual", notes: "$200 Jan–Jun and Jul–Dec on U.S. Dell purchases." },
-        { name: "Indeed credit", amount: 360, freq: "quarterly", notes: "$90 per quarter on Indeed." },
-        { name: "Wireless credit", amount: 120, freq: "monthly", notes: "$10/mo on U.S. wireless carriers." },
-        { name: "Adobe credit", amount: 150, freq: "annual" },
-        { ...GE }, { name: "Centurion + Priority Pass lounge access", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Business Gold", issuer: "American Express", fee: 375, earn: "4x TOP 2 CATEGORIES · 1x ELSE",
-      earnDetails: ["4x on your 2 top eligible categories each month (up to $150k/yr)", "1x Everything else"], ...CAT_COLORS.amexGold,
-      benefits: [
-        { name: "Flexible Business credit", amount: 240, freq: "monthly", notes: "$20/mo across FedEx, Grubhub & office-supply stores." },
-        { name: "Walmart+ membership credit", amount: 155, freq: "monthly", notes: "$12.95/mo covers a Walmart+ plan." },
-      ] },
     { name: "Delta SkyMiles Reserve Business", issuer: "Amex / Delta", fee: 650, earn: "3x DELTA · 1x ELSE",
       earnDetails: ["3x Delta purchases", "1x Everything else"], ...CAT_COLORS.delta,
       benefits: [
@@ -329,79 +283,90 @@ const CARD_CATALOG = [
         { name: "Delta flight credit", amount: 200, freq: "annual", notes: "After $10k annual spend." },
         { name: "First checked bag free", amount: 0, freq: "multiyear" },
       ] },
-    { name: "Marriott Bonvoy Business", issuer: "Amex / Marriott", fee: 125, earn: "6x MARRIOTT · 4x GAS / DINING / SHIPPING / WIRELESS",
-      earnDetails: ["6x Marriott stays", "4x Gas, dining, shipping & wireless", "2x Everything else"], ...CAT_COLORS.marriott,
+  ] },
+  { group: "United MileagePlus", items: [
+    { name: "United Explorer", issuer: "Chase / United", fee: 150, earn: "2x UNITED · DINING · HOTELS",
+      earnDetails: ["2x United purchases", "2x Dining", "2x Hotel stays", "1x Everything else"], ...CAT_COLORS.united,
       benefits: [
-        { name: "Annual free night (35k)", amount: 0, freq: "annual" },
-        { name: "Gold Elite status", amount: 0, freq: "multiyear" },
+        { name: "First checked bag free (you + companion)", amount: 0, freq: "multiyear" },
+        { name: "United Club one-time passes (2/yr)", amount: 0, freq: "annual" },
+        { ...GE },
       ] },
-    { name: "Hilton Honors Business", issuer: "Amex / Hilton", fee: 195, earn: "12x HILTON · 5x TRAVEL / GAS / DINING / SHIPPING / PHONE",
-      earnDetails: ["12x Hilton stays", "5x Travel, gas, dining, shipping, wireless & U.S. business categories", "3x Everything else"], ...CAT_COLORS.hilton,
+    { name: "United Quest", issuer: "Chase / United", fee: 350, earn: "3x UNITED · 2x TRAVEL & DINING",
+      earnDetails: ["3x United purchases", "2x Other travel", "2x Dining & streaming", "1x Everything else"], ...CAT_COLORS.united,
       benefits: [
-        { name: "Hilton credit", amount: 240, freq: "quarterly", notes: "$60 per quarter on Hilton purchases." },
-        { name: "Gold status", amount: 0, freq: "multiyear" },
+        { name: "United travel credit", amount: 200, freq: "annual", notes: "Rideshare + United credits per current terms." },
+        { name: "First & second checked bags free", amount: 0, freq: "multiyear" },
+        { ...GE },
+      ] },
+    { name: "United Club Infinite", issuer: "Chase / United", fee: 525, earn: "4x UNITED · 2x TRAVEL & DINING",
+      earnDetails: ["4x United purchases", "2x Other travel", "2x Dining", "1x Everything else"], ...CAT_COLORS.united,
+      benefits: [
+        { name: "United Club membership", amount: 0, freq: "multiyear" },
+        { name: "Two checked bags free", amount: 0, freq: "multiyear" },
+        { ...GE },
+      ] },
+    { name: "United Gateway", issuer: "Chase / United", fee: 0, earn: "2x UNITED · GAS · TRANSIT",
+      earnDetails: ["2x United purchases", "2x Gas stations", "2x Local transit", "1x Everything else"], ...CAT_COLORS.united, benefits: [] },
+    { name: "United Business", issuer: "Chase / United", fee: 99, earn: "2x UNITED · DINING / GAS / OFFICE / TRANSIT",
+      earnDetails: ["2x United purchases", "2x Dining, gas, office supply & transit", "1x Everything else"], ...CAT_COLORS.united,
+      benefits: [{ name: "First checked bag free", amount: 0, freq: "multiyear" }] },
+  ] },
+  { group: "Southwest Rapid Rewards", items: [
+    { name: "Southwest Rapid Rewards Priority", issuer: "Chase / Southwest", fee: 149, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
+      earnDetails: ["3x Southwest purchases", "2x Local transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
+      benefits: [
+        { name: "Annual Southwest travel credit", amount: 75, freq: "annual" },
+        { name: "Upgraded boardings (4/yr)", amount: 0, freq: "annual" },
+        { name: "Anniversary points (7,500)", amount: 0, freq: "annual" },
+      ] },
+    { name: "Southwest Rapid Rewards Premier", issuer: "Chase / Southwest", fee: 99, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
+      earnDetails: ["3x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
+      benefits: [{ name: "Anniversary points (6,000)", amount: 0, freq: "annual" }] },
+    { name: "Southwest Rapid Rewards Plus", issuer: "Chase / Southwest", fee: 69, earn: "2x SOUTHWEST · 2x TRANSIT & DINING",
+      earnDetails: ["2x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
+      benefits: [{ name: "Anniversary points (3,000)", amount: 0, freq: "annual" }] },
+    { name: "Southwest Business Premier", issuer: "Chase / Southwest", fee: 99, earn: "3x SOUTHWEST · 2x TRANSIT & DINING",
+      earnDetails: ["3x Southwest purchases", "2x Transit, rideshare & dining", "1x Everything else"], ...CAT_COLORS.southwest,
+      benefits: [{ name: "Anniversary points (6,000)", amount: 0, freq: "annual" }] },
+    { name: "Southwest Business Performance", issuer: "Chase / Southwest", fee: 199, earn: "4x SOUTHWEST · 3x RIDESHARE · 2x ADS/INTERNET/PHONE",
+      earnDetails: ["4x Southwest purchases", "3x Rideshare", "2x Social media ads, internet, cable & phone", "1x Everything else"], ...CAT_COLORS.southwest,
+      benefits: [
+        { name: "Upgraded boardings (4/yr)", amount: 0, freq: "annual" },
+        { name: "Inflight Wi-Fi credits (365/yr)", amount: 0, freq: "annual" },
+        { name: "Anniversary points (9,000)", amount: 0, freq: "annual" },
       ] },
   ] },
-  { group: "Citi travel", items: [
-    { name: "Citi Strata Elite", issuer: "Citi", fee: 595, earn: "12x CITI TRAVEL HOTELS/CARS · 6x RESTAURANTS (weekends) · 1.5x ELSE",
-      earnDetails: ["12x Hotels, car rentals & attractions via Citi Travel", "6x Restaurants (Fri–Sun)", "3x Restaurants (other days)", "1.5x Everything else"], ...CAT_COLORS.citiDark,
-      benefits: [
-        { name: "Annual hotel benefit (Citi Travel)", amount: 300, freq: "annual", notes: "$300 off a single hotel stay booked via Citi Travel." },
-        { name: "Splurge credit", amount: 200, freq: "annual", notes: "$200 across select partners (American Airlines, Live Nation, 1stDibs…)." },
-        { ...GE }, { name: "Lounge access (Admirals Club day passes + Priority Pass)", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Citi Strata Premier", issuer: "Citi", fee: 95, earn: "10x CITI TRAVEL · 3x AIR / DINING / GROCERY / GAS / EV",
-      earnDetails: ["10x Hotels, car rentals & attractions via Citi Travel", "3x Air travel, dining, supermarkets, gas & EV charging", "1x Everything else"], ...CAT_COLORS.citiLight,
-      benefits: [{ name: "Annual hotel credit", amount: 100, freq: "annual", notes: "$100 off a single $500+ hotel stay via Citi Travel." }] },
-    { name: "Citi AAdvantage MileUp", issuer: "Citi / American Airlines", fee: 0, earn: "2x AA · GROCERY",
-      earnDetails: ["2x American Airlines purchases", "2x U.S. supermarkets", "1x Everything else"], ...CAT_COLORS.citiLight, benefits: [] },
-    { name: "Citi / AAdvantage Business", issuer: "Citi / American Airlines", fee: 99, earn: "2x AA · TELECOM / CAR RENTAL / GAS",
-      earnDetails: ["2x American Airlines purchases", "2x Telecom, cable, car rental & gas", "1x Everything else"], ...CAT_COLORS.aaGraphite,
-      benefits: [
-        { name: "First checked bag free", amount: 0, freq: "multiyear" },
-        { name: "Companion certificate after $30k spend", amount: 0, freq: "annual" },
-      ] },
-  ] },
-  { group: "Capital One travel", items: [
-    { name: "Venture X", issuer: "Capital One", fee: 395, earn: "10x HOTELS & CARS (CAP ONE TRAVEL) · 5x FLIGHTS · 2x ELSE",
-      earnDetails: ["10x Hotels & rental cars via Capital One Travel", "5x Flights & vacation rentals via Capital One Travel", "2x Everything else"], ...CAT_COLORS.capDark,
-      benefits: [
-        { name: "Annual travel credit (Capital One Travel)", amount: 300, freq: "annual" },
-        { name: "Anniversary bonus miles", amount: 100, freq: "annual", notes: "10,000 miles (~$100) each anniversary." },
-        { ...GE }, { name: "Priority Pass + Capital One Lounge access", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "VentureOne Rewards", issuer: "Capital One", fee: 0, earn: "1.25x EVERYTHING · 5x TRAVEL (PORTAL)",
-      earnDetails: ["5x Hotels & rental cars via Capital One Travel", "1.25x Miles on every purchase"], ...CAT_COLORS.capNavy, benefits: [] },
-    { name: "Venture X Business", issuer: "Capital One", fee: 395, earn: "10x HOTELS & CARS (PORTAL) · 5x FLIGHTS · 2x ELSE",
-      earnDetails: ["10x Hotels & rental cars via Capital One Travel", "5x Flights via Capital One Travel", "2x Everything else"], ...CAT_COLORS.capDark,
-      benefits: [
-        { name: "Annual travel credit (Capital One Travel)", amount: 300, freq: "annual" },
-        { name: "Anniversary bonus miles", amount: 100, freq: "annual", notes: "10,000 miles (~$100) each anniversary." },
-        { ...GE }, { name: "Priority Pass + Capital One Lounge access", amount: 0, freq: "multiyear" },
-      ] },
-    { name: "Spark Miles (Business)", issuer: "Capital One", fee: 95, earn: "2x EVERYTHING · 5x TRAVEL (PORTAL)",
-      earnDetails: ["5x Hotels & rental cars via Capital One Travel", "2x Miles on every purchase"], ...CAT_COLORS.capNavy,
-      benefits: [{ ...GE }] },
-  ] },
-  { group: "Airline cards", items: [
+  { group: "Alaska Mileage Plan", items: [
     { name: "Alaska Airlines Visa", issuer: "Bank of America / Alaska", fee: 95, earn: "3x ALASKA · 2x GAS / GROCERY / DINING",
       earnDetails: ["3x Alaska purchases", "2x Gas, EV charging, groceries & dining", "1x Everything else"], ...CAT_COLORS.alaska,
       benefits: [
         { name: "Annual Companion Fare ($99 + taxes)", amount: 0, freq: "annual" },
         { name: "First checked bag free", amount: 0, freq: "multiyear" },
       ] },
+  ] },
+  { group: "JetBlue TrueBlue", items: [
     { name: "JetBlue Plus", issuer: "Barclays / JetBlue", fee: 99, earn: "6x JETBLUE · 2x DINING & GROCERY",
       earnDetails: ["6x JetBlue purchases", "2x Dining & groceries", "1x Everything else"], ...CAT_COLORS.jetblue,
       benefits: [
         { name: "First checked bag free", amount: 0, freq: "multiyear" },
         { name: "Anniversary points (5,000)", amount: 0, freq: "annual" },
       ] },
-    { name: "AAdvantage Aviator Red", issuer: "Barclays / American Airlines", fee: 99, earn: "2x AMERICAN AIRLINES",
-      earnDetails: ["2x American Airlines purchases", "1x Everything else"], ...CAT_COLORS.aaGraphite,
+  ] },
+  { group: "Air Canada Aeroplan", items: [
+    { name: "Aeroplan", issuer: "Chase / Air Canada", fee: 95, earn: "3x AIR CANADA · 3x DINING & GROCERY",
+      earnDetails: ["3x Air Canada / Aeroplan", "3x Dining & groceries", "1x Everything else"], ...CAT_COLORS.aeroplan,
       benefits: [
-        { name: "First checked bag free", amount: 0, freq: "multiyear" },
-        { name: "Companion certificate after spend", amount: 0, freq: "annual" },
+        { name: "First checked bag free (Air Canada)", amount: 0, freq: "multiyear" },
+        { ...GE },
       ] },
+  ] },
+  { group: "British Airways Avios", items: [
+    { name: "British Airways Visa Signature", issuer: "Chase / British Airways", fee: 95, earn: "3x BRITISH AIRWAYS · 2x TRAVEL",
+      earnDetails: ["3x British Airways / Aer Lingus / Iberia", "2x Hotel & other travel", "1x Everything else"], ...CAT_COLORS.britishair,
+      benefits: [{ name: "Travel Together companion ticket after spend", amount: 0, freq: "annual" }] },
+  ] },
+  { group: "Other airline miles", items: [
     { name: "Hawaiian Airlines World Elite", issuer: "Barclays / Hawaiian", fee: 99, earn: "3x HAWAIIAN · 2x DINING / GAS / GROCERY",
       earnDetails: ["3x Hawaiian Airlines purchases", "2x Dining, gas & groceries", "1x Everything else"], ...CAT_COLORS.hawaiian,
       benefits: [
@@ -419,6 +384,79 @@ const CARD_CATALOG = [
     { name: "Free Spirit Travel More", issuer: "Bank of America / Spirit", fee: 79, earn: "3x SPIRIT · 2x DINING",
       earnDetails: ["3x Spirit purchases", "2x Dining", "1x Everything else"], ...CAT_COLORS.spirit,
       benefits: [{ name: "Anniversary points (5,000)", amount: 0, freq: "annual" }] },
+  ] },
+  { group: "Marriott Bonvoy", items: [
+    { name: "Marriott Bonvoy Boundless", issuer: "Chase / Marriott", fee: 95, earn: "6x MARRIOTT · 3x GROCERY / GAS / DINING",
+      earnDetails: ["6x Marriott stays", "3x Grocery, gas & dining (on first $6k/yr)", "2x Everything else"], ...CAT_COLORS.marriott,
+      benefits: [
+        { name: "Anniversary free night (35k)", amount: 0, freq: "annual" },
+        { name: "Silver Elite status", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Marriott Bonvoy Brilliant", issuer: "Amex / Marriott", fee: 650, earn: "6x MARRIOTT · 3x DINING & FLIGHTS",
+      earnDetails: ["6x Marriott stays", "3x Dining worldwide & flights booked direct", "2x Everything else"], ...CAT_COLORS.marriott,
+      benefits: [
+        { name: "Dining credit", amount: 300, freq: "monthly", notes: "$25/mo at restaurants worldwide." },
+        { name: "Annual free night (85k)", amount: 0, freq: "annual" },
+        { name: "Platinum Elite status", amount: 0, freq: "multiyear" },
+        { ...GE },
+      ] },
+    { name: "Marriott Bonvoy Bevy", issuer: "Amex / Marriott", fee: 250, earn: "6x MARRIOTT · 4x DINING & GROCERY",
+      earnDetails: ["6x Marriott stays", "4x Dining & U.S. supermarkets", "2x Everything else"], ...CAT_COLORS.marriott,
+      benefits: [{ name: "Gold Elite status", amount: 0, freq: "multiyear" }] },
+    { name: "Marriott Bonvoy Business", issuer: "Amex / Marriott", fee: 125, earn: "6x MARRIOTT · 4x GAS / DINING / SHIPPING / WIRELESS",
+      earnDetails: ["6x Marriott stays", "4x Gas, dining, shipping & wireless", "2x Everything else"], ...CAT_COLORS.marriott,
+      benefits: [
+        { name: "Annual free night (35k)", amount: 0, freq: "annual" },
+        { name: "Gold Elite status", amount: 0, freq: "multiyear" },
+      ] },
+  ] },
+  { group: "World of Hyatt", items: [
+    { name: "World of Hyatt", issuer: "Chase / Hyatt", fee: 95, earn: "4x HYATT · 2x DINING / FLIGHTS / TRANSIT / FITNESS",
+      earnDetails: ["4x Hyatt stays", "2x Dining, flights, transit & fitness", "1x Everything else"], ...CAT_COLORS.hyatt,
+      benefits: [
+        { name: "Anniversary free night (Cat 1–4)", amount: 0, freq: "annual" },
+        { name: "Discoverist status", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "World of Hyatt Business", issuer: "Chase / Hyatt", fee: 199, earn: "4x HYATT · 2x TOP 3 SPEND CATEGORIES",
+      earnDetails: ["4x Hyatt stays", "2x on your top 3 eligible spend categories", "1x Everything else"], ...CAT_COLORS.hyatt,
+      benefits: [
+        { name: "Hyatt statement credits", amount: 100, freq: "semiannual", notes: "$50 twice a year on Hyatt spend." },
+        { name: "Discoverist status", amount: 0, freq: "multiyear" },
+      ] },
+  ] },
+  { group: "Hilton Honors", items: [
+    { name: "Hilton Honors", issuer: "Amex / Hilton", fee: 0, earn: "7x HILTON · 5x DINING / GROCERY / GAS",
+      earnDetails: ["7x Hilton stays", "5x U.S. dining, supermarkets & gas", "3x Everything else"], ...CAT_COLORS.hilton, benefits: [] },
+    { name: "Hilton Honors Surpass", issuer: "Amex / Hilton", fee: 150, earn: "12x HILTON · 6x DINING / GROCERY / GAS",
+      earnDetails: ["12x Hilton stays", "6x U.S. dining, supermarkets & gas", "4x U.S. online retail", "3x Everything else"], ...CAT_COLORS.hilton,
+      benefits: [
+        { name: "Hilton credit", amount: 200, freq: "quarterly", notes: "$50 per quarter on Hilton purchases." },
+        { name: "Gold status", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Hilton Honors Aspire", issuer: "Amex / Hilton", fee: 550, earn: "14x HILTON · 7x FLIGHTS / CAR RENTAL / DINING",
+      earnDetails: ["14x Hilton stays", "7x Flights, car rentals & U.S. dining", "3x Everything else"], ...CAT_COLORS.hilton,
+      benefits: [
+        { name: "Hilton resort credit", amount: 400, freq: "semiannual", notes: "$200 Jan–Jun and Jul–Dec at Hilton resorts." },
+        { name: "Airline flight credit", amount: 200, freq: "quarterly", notes: "$50 per quarter on flights." },
+        { name: "CLEAR Plus credit", amount: 199, freq: "annual" },
+        { name: "Annual free night reward", amount: 0, freq: "annual" },
+        { name: "Diamond status", amount: 0, freq: "multiyear" },
+      ] },
+    { name: "Hilton Honors Business", issuer: "Amex / Hilton", fee: 195, earn: "12x HILTON · 5x TRAVEL / GAS / DINING / SHIPPING / PHONE",
+      earnDetails: ["12x Hilton stays", "5x Travel, gas, dining, shipping, wireless & U.S. business categories", "3x Everything else"], ...CAT_COLORS.hilton,
+      benefits: [
+        { name: "Hilton credit", amount: 240, freq: "quarterly", notes: "$60 per quarter on Hilton purchases." },
+        { name: "Gold status", amount: 0, freq: "multiyear" },
+      ] },
+  ] },
+  { group: "IHG One Rewards", items: [
+    { name: "IHG One Rewards Premier", issuer: "Chase / IHG", fee: 99, earn: "10x IHG · 5x TRAVEL / DINING / GAS",
+      earnDetails: ["10x IHG stays", "5x Travel, dining & gas", "3x Everything else"], ...CAT_COLORS.ihg,
+      benefits: [
+        { name: "Anniversary free night (40k)", amount: 0, freq: "annual" },
+        { name: "Platinum Elite status", amount: 0, freq: "multiyear" },
+        { ...GE },
+      ] },
   ] },
 ];
 
@@ -441,50 +479,9 @@ const FREQ = {
   multiyear: { label: "No fixed deadline", short: "—" },
 };
 
-const DEFAULT_BENEFITS = [
-  { id: "g1", cardId: "gold", name: "Dining credit (Grubhub, Five Guys, Cheesecake Factory, Wonder…)", amount: 10, freq: "monthly", notes: "Enrollment required." },
-  { id: "g2", cardId: "gold", name: "Uber Cash", amount: 10, freq: "monthly", notes: "Add card to Uber wallet; expires monthly." },
-  { id: "g3", cardId: "gold", name: "Dunkin' credit", amount: 7, freq: "monthly", notes: "U.S. Dunkin' locations. Enrollment required." },
-  { id: "g4", cardId: "gold", name: "Resy dining credit", amount: 50, freq: "semiannual", notes: "Up to $50 Jan–Jun and $50 Jul–Dec at U.S. Resy restaurants." },
-  { id: "p1", cardId: "plat", name: "Airline incidental fee credit", amount: 200, freq: "annual", notes: "Select one airline; covers incidentals like bags & seat fees." },
-  { id: "p2", cardId: "plat", name: "Uber Cash", amount: 15, freq: "monthly", notes: "$15/mo + $20 bonus in December." },
-  { id: "p3", cardId: "plat", name: "Uber One membership credit", amount: 120, freq: "annual", notes: "Auto-renewing Uber One paid with the card." },
-  { id: "p4", cardId: "plat", name: "Hotel credit (FHR / Hotel Collection)", amount: 300, freq: "semiannual", notes: "Prepaid Amex Travel bookings; THC needs 2-night min." },
-  { id: "p5", cardId: "plat", name: "Resy dining credit", amount: 100, freq: "quarterly", notes: "U.S. Resy partner restaurants; enrollment required." },
-  { id: "p6", cardId: "plat", name: "Digital entertainment credit", amount: 25, freq: "monthly", notes: "Eligible subscriptions (Peacock, Audible, NYT…)." },
-  { id: "p7", cardId: "plat", name: "lululemon credit", amount: 75, freq: "quarterly", notes: "U.S. lululemon purchases; enrollment required." },
-  { id: "p8", cardId: "plat", name: "Walmart+ membership credit", amount: 13, freq: "monthly", notes: "Covers monthly Walmart+ plan paid with the card." },
-  { id: "p9", cardId: "plat", name: "CLEAR+ credit", amount: 209, freq: "annual", notes: "Applied when you pay for CLEAR+ with the card." },
-  { id: "p10", cardId: "plat", name: "Global Entry / TSA PreCheck fee", amount: 120, freq: "multiyear", notes: "Once every 4–4.5 years." },
-  { id: "c1", cardId: "csp", name: "Chase Travel hotel credit", amount: 100, freq: "annual", notes: "Doubled to $100 in the June 2026 refresh; resets each account anniversary — adjust timing to yours." },
-  { id: "c2", cardId: "csp", name: "DoorDash non-restaurant promo", amount: 10, freq: "monthly", notes: "Requires activated DashPass (activate by 12/31/27)." },
-  { id: "c3", cardId: "csp", name: "Apple TV — 1 year free", amount: 13, freq: "monthly", notes: "Must activate by Dec 31, 2026." },
-  { id: "c4", cardId: "csp", name: "Global Entry / TSA PreCheck / NEXUS fee", amount: 120, freq: "multiyear", notes: "Once every 4 years — new with the 2026 refresh." },
-  { id: "i1", cardId: "cibp", name: "Cell phone protection", amount: 0, freq: "multiyear", notes: "Pay your phone bill with the card to stay covered (up to $1,000/claim). No recurring credits on this card — its value is 3x categories." },
-  { id: "a1", cardId: "citi-exec", name: "Admirals Club membership", amount: 0, freq: "multiyear", notes: "Full membership + 2 guests. Immediate family included." },
-  { id: "a2", cardId: "citi-exec", name: "Avis / Budget rental credit", amount: 120, freq: "annual", notes: "On eligible prepaid rentals." },
-  { id: "a3", cardId: "citi-exec", name: "Lyft credit", amount: 10, freq: "monthly", notes: "$10 back after 3 eligible rides each month." },
-  { id: "a4", cardId: "citi-exec", name: "Grubhub credit", amount: 10, freq: "monthly", notes: "Monthly statement credit on eligible orders." },
-  { id: "a5", cardId: "citi-exec", name: "Global Entry / TSA PreCheck fee", amount: 120, freq: "multiyear", notes: "Once every 4 years." },
-  { id: "cps1", cardId: "citi-plat", name: "Free checked bag (+ up to 4 guests)", amount: 0, freq: "multiyear", notes: "Domestic AA flights; cardmember + 4 companions." },
-  { id: "cps2", cardId: "citi-plat", name: "$125 AA flight discount", amount: 125, freq: "annual", notes: "Earned after $20k spend during membership year. Auto-renews if card renewed." },
-  { id: "cps3", cardId: "citi-plat", name: "Annual fee waiver (year 1)", amount: 99, freq: "multiyear", notes: "First year free; $99/year thereafter." },
-  { id: "cov1", cardId: "cap-venture", name: "Global Entry / TSA PreCheck credit", amount: 120, freq: "multiyear", notes: "Once every 4 years. Capital One reimburses fee." },
-  { id: "cov2", cardId: "cap-venture", name: "2x miles on all purchases", amount: 0, freq: "multiyear", notes: "Unlimited; no category caps. Simplest earning structure." },
-];
+const DEFAULT_BENEFITS = [];
 
-const DEFAULT_POINTS = [
-  { id: "amex", name: "Amex Membership Rewards", cards: "Gold + Platinum", balance: 470000, cpp: 2.0 },
-  { id: "chase", name: "Chase Ultimate Rewards", cards: "Sapphire Preferred + Ink Preferred", balance: 77000, cpp: 2.05 },
-  { id: "p2chase", name: "P2's Chase Ultimate Rewards", cards: "P2 · estimated", balance: 60000, cpp: 2.05, p2: true },
-  { id: "capone", name: "Capital One Miles", cards: "Venture Rewards", balance: 0, cpp: 1.85 },
-  { id: "aa", name: "American AAdvantage", cards: "Citi Executive + Platinum Select", balance: 70000, cpp: 1.5 },
-  { id: "delta", name: "Delta SkyMiles", cards: "Airline program", balance: 13000, cpp: 1.2 },
-  { id: "ua", name: "United MileagePlus", cards: "Airline program", balance: 24000, cpp: 1.35 },
-  { id: "sw", name: "Southwest Rapid Rewards", cards: "Airline program", balance: 16000, cpp: 1.3 },
-  { id: "ac", name: "Air Canada Aeroplan", cards: "Airline program", balance: 16000, cpp: 1.5 },
-  { id: "marriott", name: "Marriott Bonvoy", cards: "Hotel program", balance: 11000, cpp: 0.8 },
-];
+const DEFAULT_POINTS = [];
 
 const STORAGE_KEY = "travel-rewards-tracker-v1";
 const REMIND_DAYS = 31; // remind ~1 month before an annual fee posts
@@ -765,7 +762,8 @@ export default function RewardsTracker() {
     }
   };
 
-  const cardOf = (id) => allCards.find((c) => c.id === id) || applySettings(CARDS[0]);
+  const cardOf = (id) => allCards.find((c) => c.id === id) ||
+    { id, name: "Card", issuer: "", fee: 0, earn: "", accent: T.borderSoft, bg: T.surfaceAlt, ink: T.text };
 
   // Points & miles editing
   const updatePoint = (id, patch) => setPoints((ps) => ps.map((p) => p.id === id ? { ...p, ...patch } : p));
@@ -939,6 +937,12 @@ export default function RewardsTracker() {
 
         {tab === "benefits" && (
           <section aria-label="Benefit deadlines">
+            {activeCards.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "44px 20px", color: T.sub }}>
+                <div className="rt-serif" style={{ fontSize: 30, color: T.text }}>Your wallet is empty.</div>
+                <div style={{ fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>Tap <strong>+ Add card</strong> above to add the cards you carry — their credits, deadlines, and perks all show up here.</div>
+              </div>
+            ) : (<>
             {/* Annual Fees Due Soon (within ~1 month) */}
             {annualFees.some((af) => af.daysLeft !== null && af.daysLeft <= REMIND_DAYS) && (
               <div style={{ marginBottom: 20, padding: "12px 14px", background: T.panel, borderRadius: 12, border: `1px solid ${T.amberBorder}` }}>
@@ -1043,6 +1047,7 @@ export default function RewardsTracker() {
             <p style={{ fontSize: 11, color: T.faint, marginTop: 18, lineHeight: 1.5 }}>
               Amounts are pre-filled from published card terms as of mid-2026 but issuers change them often — tap "edit" on any row to correct values, and verify against your own benefit terms. Anniversary-based credits (like the Sapphire hotel credit) are tracked here on a calendar year; adjust to your renewal month if it differs. Set each card's real fee amount and renewal month under <strong>⚙ manage cards</strong> so reminders land on time.
             </p>
+            </>)}
           </section>
         )}
 
@@ -1055,8 +1060,8 @@ export default function RewardsTracker() {
 
             {todoCount === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px", color: T.sub }}>
-                <div className="rt-serif" style={{ fontSize: 28 }}>All caught up.</div>
-                <div style={{ fontSize: 13, marginTop: 6 }}>Every active credit for the current period is checked off. Nice.</div>
+                <div className="rt-serif" style={{ fontSize: 28, color: T.text }}>{activeCards.length === 0 ? "Nothing to track yet." : "All caught up."}</div>
+                <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>{activeCards.length === 0 ? "Add the cards you carry with + Add card, and their credits will show up here as a to-do list." : "Every active credit for the current period is checked off. Nice."}</div>
               </div>
             ) : (
               TODO_ORDER.map((f) => {
@@ -1109,6 +1114,12 @@ export default function RewardsTracker() {
 
         {tab === "scorecard" && (
           <section aria-label="Annual fee scorecard">
+            {activeCards.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "44px 20px", color: T.sub }}>
+                <div className="rt-serif" style={{ fontSize: 28, color: T.text }}>No cards to score yet.</div>
+                <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Add a card and this tab tracks how much of each annual fee you've earned back in credits.</div>
+              </div>
+            ) : (<>
             <p style={{ fontSize: 13, color: T.sub, margin: "0 0 14px", lineHeight: 1.5 }}>
               How much of each annual fee you've clawed back in {now.getFullYear()} through statement credits. To log what you used in January–June, open any benefit on the Deadlines tab, tap <strong>edit</strong>, and tap the past periods in the year log.
             </p>
@@ -1151,16 +1162,12 @@ export default function RewardsTracker() {
             <p style={{ fontSize: 11, color: T.faint, marginTop: 14, lineHeight: 1.5 }}>
               This counts statement credits only. Points earned, lounge access (Centurion, Admirals Club), elite status, and travel protections aren't in these numbers — so a card can be worth keeping even below the break-even line.
             </p>
+            </>)}
           </section>
         )}
 
         {tab === "points" && (
           <section aria-label="Points balances">
-            <div style={{ background: T.amberBg, border: `1px solid ${T.amberBorder}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13, lineHeight: 1.5 }}>
-              <strong className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.amberText }}>HEADS UP · OCT 1, 2026</strong>
-              <div style={{ marginTop: 4 }}>Chase Ultimate Rewards transfers to World of Hyatt drop from 1:1 to 4:3 on Oct 1, 2026 for Sapphire Preferred and Ink Preferred. If you have a Hyatt redemption planned, transfer before then.</div>
-            </div>
-
             {/* Toggle to include/exclude partner (P2) accounts */}
             {points.some((p) => p.p2) && (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
@@ -1290,10 +1297,8 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
                   {(c.issuer || "").toUpperCase()}{c.enabled ? "" : " · OFF"}
                 </div>
               </div>
-              {customIds.has(c.id) && (
-                <button onClick={() => onRemove(c.id)} className="rt-mono"
-                  style={{ background: "none", border: "none", color: T.red, fontSize: 10, textDecoration: "underline", flex: "0 0 auto" }}>remove</button>
-              )}
+              <button onClick={() => onRemove(c.id)} className="rt-mono"
+                style={{ background: "none", border: `1px solid ${T.red}`, borderRadius: 999, color: T.red, fontSize: 10, letterSpacing: .5, padding: "3px 9px", flex: "0 0 auto" }}>Delete</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "end", opacity: c.enabled ? 1 : .5 }}>
               <div>
