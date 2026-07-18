@@ -1,0 +1,16 @@
+{
+  "appId": "com.nexusrewards.app",
+  "appName": "Nexus",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "ios": {
+    "scheme": "Nexus",
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#8B909A"
+    }
+  }
+}
