@@ -1470,8 +1470,12 @@ function BestCardPanel({ T, cards, onClose }) {
   const ranked = cards
     .map((c) => ({ card: c, rate: rateFor(c, cat), value: cardValue(c, cat) }))
     .sort((a, b) => b.value - a.value || b.rate - a.rate);
-  const best = ranked[0];
   const fmtRate = (r) => (Number.isInteger(r) ? r : r.toFixed(1)) + "×";
+  // Cards within ~0.05¢ of the top value are treated as a tie and shown as equal.
+  const topVal = ranked.length ? ranked[0].value : 0;
+  const winners = ranked.filter((r) => Math.abs(r.value - topVal) < 0.05);
+  const rest = ranked.filter((r) => Math.abs(r.value - topVal) >= 0.05);
+  const tie = winners.length > 1;
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, marginTop: 10, display: "grid", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1489,21 +1493,32 @@ function BestCardPanel({ T, cards, onClose }) {
         ))}
       </div>
 
-      {best && (
-        <div style={{ background: best.card.bg, color: best.card.ink, borderRadius: 12, padding: "16px 18px", boxShadow: `0 6px 16px ${T.shadow}` }}>
-          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, opacity: .8 }}>BEST FOR {label.toUpperCase()}{best.card.p2 ? " · P2" : ""}</div>
-          <div style={{ fontWeight: 700, fontSize: 20, marginTop: 4, lineHeight: 1.15 }}>{best.card.displayName}</div>
-          <div className="rt-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>
-            {fmtRate(best.rate)} points · ≈ {best.value.toFixed(1)}¢ back per $1
-          </div>
+      {winners.length > 0 && (
+        <div style={{ display: "grid", gap: 8 }}>
+          {tie && (
+            <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.amberText }}>
+              ⚖ TIE FOR {label.toUpperCase()} · {winners.length} CARDS EQUAL
+            </div>
+          )}
+          {winners.map((w) => (
+            <div key={w.card.id} style={{ background: w.card.bg, color: w.card.ink, borderRadius: 12, padding: "16px 18px", boxShadow: `0 6px 16px ${T.shadow}` }}>
+              <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, opacity: .8 }}>
+                {tie ? "EQUAL BEST" : "BEST"} FOR {label.toUpperCase()}{w.card.p2 ? " · P2" : ""}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 20, marginTop: 4, lineHeight: 1.15 }}>{w.card.displayName}</div>
+              <div className="rt-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+                {fmtRate(w.rate)} points · ≈ {w.value.toFixed(1)}¢ back per $1
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {ranked.length > 1 && (
+      {rest.length > 0 && (
         <div>
           <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub, marginBottom: 6 }}>OTHER CARDS</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {ranked.slice(1, 5).map((r) => (
+            {rest.slice(0, 5).map((r) => (
               <div key={r.card.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: T.surfaceAlt, border: `1px solid ${T.border}`, borderLeft: `4px solid ${r.card.accent}`, borderRadius: 10, padding: "9px 12px" }}>
                 <span style={{ fontWeight: 600, fontSize: 13, minWidth: 0 }}>{r.card.displayName}{r.card.p2 && <span className="rt-mono" style={{ fontSize: 8, letterSpacing: 1, color: T.amberText, marginLeft: 6 }}>P2</span>}</span>
                 <span className="rt-mono" style={{ fontSize: 12, color: T.sub, flex: "0 0 auto" }}>{fmtRate(r.rate)} · ≈{r.value.toFixed(1)}¢</span>
