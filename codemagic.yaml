@@ -6,7 +6,8 @@
 #      "Personal" is referenced below. Change that name if your key uses a different one.
 #   3. In App Store Connect, create the app record with bundle ID  com.nexusrewards.app
 #      (or change BUNDLE_ID below and in capacitor.config.json to your own unique ID).
-#   4. Codemagic auto-manages signing certificates/profiles once the integration is set.
+#   4. The signing step below creates the distribution certificate + provisioning profile
+#      automatically on the first build (using the "Personal" key), so no manual profile setup.
 #
 # Then: push to your repo (or hit "Start new build") and Codemagic archives + uploads to TestFlight.
 
@@ -18,11 +19,8 @@ workflows:
     integrations:
       app_store_connect: Personal   # name of your App Store Connect API key in Codemagic (Team settings → Integrations)
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.nexusrewards.app     # keep in sync with capacitor.config.json
       vars:
-        BUNDLE_ID: "com.nexusrewards.app"
+        BUNDLE_ID: "com.nexusrewards.app"           # keep in sync with capacitor.config.json
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
       node: 20
@@ -44,8 +42,15 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App && pod install
-      - name: Apply managed signing profiles
+      - name: Set up code signing — create the certificate & profile if they don't exist yet
         script: |
+          # --create makes a distribution certificate and an App Store provisioning
+          # profile for this bundle ID if none exist yet (first build for a new app).
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain initialize
+          keychain add-certificates
           xcode-project use-profiles
       - name: Set the build number
         script: |
