@@ -2,8 +2,8 @@
 #
 # ONE-TIME SETUP in the Codemagic dashboard before your first build:
 #   1. Connect this project's Git repo to Codemagic (Applications → Add application).
-#   2. Team → Integrations → App Store Connect: add an App Store Connect API key.
-#      Name it exactly "Nexus App Store Connect" (or change the name below to match).
+#   2. Team → Integrations → App Store Connect: an App Store Connect API key named
+#      "Personal" is referenced below. Change that name if your key uses a different one.
 #   3. In App Store Connect, create the app record with bundle ID  com.nexusrewards.app
 #      (or change BUNDLE_ID below and in capacitor.config.json to your own unique ID).
 #   4. Codemagic auto-manages signing certificates/profiles once the integration is set.
@@ -16,7 +16,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: Nexus App Store Connect   # must match the integration name in Codemagic
+      app_store_connect: Personal   # name of your App Store Connect API key in Codemagic (Team settings → Integrations)
     environment:
       ios_signing:
         distribution_type: app_store
