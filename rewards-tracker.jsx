@@ -527,6 +527,66 @@ const cardNameSize = (name) => {
 // 2-line clamp shared by card tiles so a wrapped name never collides with the fee row.
 const cardNameClamp = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
 
+/* ————— "Which card should I use?" — best card per spend category ————— */
+const SPEND_CATS = [
+  { key: "dining", label: "Restaurants" },
+  { key: "groceries", label: "Groceries" },
+  { key: "gas", label: "Gas" },
+  { key: "flights", label: "Flights" },
+  { key: "hotels", label: "Hotels" },
+  { key: "travel", label: "Other travel" },
+  { key: "transit", label: "Transit" },
+  { key: "streaming", label: "Streaming" },
+  { key: "online", label: "Online shopping" },
+  { key: "everything", label: "Everything else" },
+];
+// Baseline cents-per-point by rewards program (keys match CARD_CATALOG group names),
+// so a 4x Amex point can be compared fairly against a 2x airline mile.
+const REWARDS_CPP = {
+  "Amex Membership Rewards": 2.0, "Chase Ultimate Rewards": 2.05, "Capital One Miles": 1.85,
+  "Citi ThankYou Points": 1.8, "American Airlines AAdvantage": 1.5, "Delta SkyMiles": 1.2,
+  "United MileagePlus": 1.35, "Southwest Rapid Rewards": 1.35, "Alaska Mileage Plan": 1.45,
+  "JetBlue TrueBlue": 1.3, "Air Canada Aeroplan": 1.5, "British Airways Avios": 1.3,
+  "Other airline miles": 1.2, "Marriott Bonvoy": 0.8, "World of Hyatt": 1.7,
+  "Hilton Honors": 0.5, "IHG One Rewards": 0.5,
+};
+const DEFAULT_CPP = 1.4;
+// Parse a card's earning categories into a { category: multiplier } map from its earnDetails.
+function cardRates(card) {
+  const src = (card.earnDetails && card.earnDetails.length) ? card.earnDetails : (card.earn ? card.earn.split("·") : []);
+  const rates = {}; let base = 1;
+  for (const raw of src) {
+    const s = String(raw).toLowerCase();
+    const m = s.match(/(\d+(?:\.\d+)?)\s*x/);
+    if (!m) continue;
+    const rate = parseFloat(m[1]);
+    if (/everything else|all other purchase|every other purchase|all purchases|every purchase|unlimited/.test(s)) base = Math.max(base, rate);
+    const add = (c) => { rates[c] = Math.max(rates[c] || 0, rate); };
+    if (/dining|restaurant/.test(s)) add("dining");
+    if (/supermarket|grocer/.test(s)) add("groceries");
+    if (/\bgas\b|ev charging/.test(s)) add("gas");
+    if (/flight|airfare|air travel|airline|united|delta|american airlines|southwest|jetblue|alaska|hawaiian|frontier|virgin atlantic|air france|air canada|british airways|spirit/.test(s)) add("flights");
+    if (/hotel|stay|resort|rental car|car rental|marriott|hilton|hyatt|\bihg\b/.test(s)) add("hotels");
+    if (/travel/.test(s)) add("travel");
+    if (/transit|rideshare|lyft/.test(s)) add("transit");
+    if (/stream/.test(s)) add("streaming");
+    if (/online retail|online shop|online groc/.test(s)) add("online");
+  }
+  rates.everything = base;
+  return rates;
+}
+function rateFor(card, cat) {
+  const r = cardRates(card);
+  if (cat === "everything") return r.everything || 1;
+  if (r[cat] != null) return r[cat];
+  if ((cat === "flights" || cat === "hotels" || cat === "transit") && r.travel != null) return r.travel;
+  return r.everything || 1;
+}
+// Effective value per $1 spent (in cents): earn multiplier × the program's cents-per-point.
+function cardValue(card, cat) {
+  return rateFor(card, cat) * (REWARDS_CPP[card.rewards] ?? DEFAULT_CPP);
+}
+
 // Next occurrence of a card's annual-fee date (1st of its renewal month).
 function nextFeeDate(annualMonth, from = new Date()) {
   if (annualMonth === undefined || annualMonth === null) return null;
@@ -605,6 +665,7 @@ export default function RewardsTracker() {
   const [editingPoint, setEditingPoint] = useState(null);
   const [showP2, setShowP2] = useState(true);
   const [detailCard, setDetailCard] = useState(null); // card id whose full details are open
+  const [bestOpen, setBestOpen] = useState(false); // "which card should I use?" panel
   const [mode, setMode] = useState("light");
   const saveTimer = useRef(null);
   const T = THEMES[mode];
@@ -612,11 +673,15 @@ export default function RewardsTracker() {
   // Merge base cards with the user's per-card settings (enabled / fee / month).
   const applySettings = (c) => {
     const s = cardSettings[c.id] || {};
+    const p2 = s.p2 !== undefined ? s.p2 : (c.p2 || false);
+    const nickname = s.nickname !== undefined ? s.nickname : (c.nickname || "");
     return {
       ...c,
       enabled: s.enabled !== undefined ? s.enabled : true,
       fee: s.fee !== undefined ? s.fee : c.fee,
       annualMonth: s.annualMonth !== undefined ? s.annualMonth : c.annualMonth,
+      p2, nickname,
+      displayName: nickname || c.name,
     };
   };
   const allCards = useMemo(() => [...CARDS, ...customCards].map(applySettings), [customCards, cardSettings]);
@@ -788,14 +853,14 @@ export default function RewardsTracker() {
   };
 
   // Add a card from the catalog, bringing its benefits along.
-  const addCatalogCard = (tpl) => {
-    const id = "card" + Date.now();
+  const addCatalogCard = (tpl, rewards, p2) => {
+    const id = "card" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
     const { benefits: tplBenefits, ...cardFields } = tpl;
-    setCustomCards((cs) => [...cs, { ...cardFields, id, annualMonth: tpl.annualMonth ?? 0 }]);
+    setCustomCards((cs) => [...cs, { ...cardFields, id, annualMonth: tpl.annualMonth ?? 0, rewards: rewards || "", p2: !!p2 }]);
     if (tplBenefits && tplBenefits.length) {
       setBenefits((bs) => [...bs, ...tplBenefits.map((b, i) => ({ ...b, id: id + "-b" + i, cardId: id, notes: b.notes || "" }))]);
     }
-    setAddingCard(false);
+    // keep the picker open so several cards (e.g. all of P2's) can be added in a row
   };
 
   if (!loaded) return (
@@ -852,7 +917,7 @@ export default function RewardsTracker() {
                   transform: active ? "translateY(-3px)" : "none", transition: "all .2s ease",
                 }}>
                 <div className="rt-mono" style={{ fontSize: 9, letterSpacing: 2, opacity: .75 }}>{c.issuer.toUpperCase()}</div>
-                <div style={{ fontWeight: 700, fontSize: cardNameSize(c.name), marginTop: 2, lineHeight: 1.12, ...cardNameClamp }}>{c.name}</div>
+                <div style={{ fontWeight: 700, fontSize: cardNameSize(c.displayName), marginTop: 2, lineHeight: 1.12, ...cardNameClamp }}>{c.displayName}</div>
                 <div className="rt-mono" style={{ fontSize: 8, letterSpacing: .8, marginTop: 5, opacity: .85, fontWeight: 600, lineHeight: 1.4, ...cardNameClamp }}>
                   ★ {c.earn}
                 </div>
@@ -860,6 +925,7 @@ export default function RewardsTracker() {
                   <span className="rt-mono" style={{ fontSize: 10, opacity: .75 }}>AF {money(c.fee)}</span>
                   <span className="rt-mono" style={{ fontSize: 12, fontWeight: 600 }}>{money(cardStake)} left</span>
                 </div>
+                {c.p2 && <span className="rt-mono" style={{ position: "absolute", top: 12, right: 46, fontSize: 8, letterSpacing: 1, fontWeight: 700, background: "rgba(0,0,0,.28)", color: "#fff", borderRadius: 4, padding: "2px 5px" }}>P2</span>}
                 <div style={{ position: "absolute", top: 13, right: 14, width: 26, height: 19, borderRadius: 4, background: "rgba(255,255,255,.35)", border: "1px solid rgba(0,0,0,.15)" }} />
               </button>
             );
@@ -877,7 +943,14 @@ export default function RewardsTracker() {
 
         {/* Manage cards + filter controls */}
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => { setManagingCards((v) => !v); setAddingCard(false); }} className="rt-mono"
+          {activeCards.length > 0 && (
+            <button onClick={() => { setBestOpen((v) => !v); setManagingCards(false); setAddingCard(false); }} className="rt-mono"
+              aria-expanded={bestOpen}
+              style={{ background: "none", border: "none", fontSize: 11, letterSpacing: 1, color: bestOpen ? T.text : T.sub, padding: "4px 2px", textDecoration: "underline" }}>
+              ⚡ which card?
+            </button>
+          )}
+          <button onClick={() => { setManagingCards((v) => !v); setAddingCard(false); setBestOpen(false); }} className="rt-mono"
             aria-expanded={managingCards}
             style={{ background: "none", border: "none", fontSize: 11, letterSpacing: 1, color: managingCards ? T.text : T.sub, padding: "4px 2px", textDecoration: "underline" }}>
             ⚙ manage cards {allCards.length > activeCards.length ? `(${activeCards.length}/${allCards.length} on)` : ""}
@@ -913,14 +986,18 @@ export default function RewardsTracker() {
 
         {addingCard && (
           <AddCardPanel T={T}
-            existingNames={new Set(allCards.map((c) => c.name.toLowerCase()))}
+            ownedCounts={allCards.reduce((m, c) => { const k = (c.name || "").toLowerCase(); m[k] = (m[k] || 0) + 1; return m; }, {})}
             onCancel={() => setAddingCard(false)}
-            onAdd={(card) => { setCustomCards((cs) => [...cs, { ...card, id: "card" + Date.now() }]); setAddingCard(false); }}
+            onAdd={(card) => { setCustomCards((cs) => [...cs, { ...card, id: "card" + Date.now() + "-" + Math.floor(Math.random() * 1e6) }]); }}
             onAddCatalog={addCatalogCard} />
         )}
 
         {detailCard && (
           <CardDetailPanel T={T} card={cardOf(detailCard)} benefits={benefits} onClose={() => setDetailCard(null)} />
+        )}
+
+        {bestOpen && (
+          <BestCardPanel T={T} cards={activeCards} onClose={() => setBestOpen(false)} />
         )}
 
         {/* Tabs */}
@@ -1292,7 +1369,10 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, opacity: c.enabled ? 1 : .5 }}>{c.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, opacity: c.enabled ? 1 : .5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {c.displayName}
+                  {c.p2 && <span className="rt-mono" style={{ fontSize: 8, letterSpacing: 1, fontWeight: 700, background: T.amberBg, color: T.amberText, border: `1px solid ${T.amberBorder}`, borderRadius: 4, padding: "1px 5px" }}>P2</span>}
+                </div>
                 <div className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, color: T.sub }}>
                   {(c.issuer || "").toUpperCase()}{c.enabled ? "" : " · OFF"}
                 </div>
@@ -1313,12 +1393,80 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
                 </select>
               </div>
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", opacity: c.enabled ? 1 : .5 }}>
+              <div>
+                <label className="rt-mono" style={lbl}>NICKNAME (TO TELL DUPLICATES APART)</label>
+                <input style={inp} value={c.nickname || ""} placeholder={`e.g. ${c.name} #2`} disabled={!c.enabled}
+                  onChange={(e) => onUpdate(c.id, { nickname: e.target.value })} />
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <label className="rt-mono" style={{ ...lbl, marginBottom: 6 }}>P2'S CARD</label>
+                <Toggle T={T} on={!!c.p2} onChange={(v) => onUpdate(c.id, { p2: v })} label={`${c.displayName} as P2`} />
+              </div>
+            </div>
           </div>
         </div>
       ))}
       <div className="rt-mono" style={{ fontSize: 10, color: T.faint, lineHeight: 1.5, marginTop: 8, letterSpacing: .3 }}>
         You'll get a reminder — a phone notification and an in-app banner — about one month before each included card's fee posts. Cards toggled off are hidden from every tab and won't remind you.
       </div>
+    </div>
+  );
+}
+
+/* ————— "Which card should I use?" panel ————— */
+function BestCardPanel({ T, cards, onClose }) {
+  const [cat, setCat] = useState("dining");
+  const label = (SPEND_CATS.find((s) => s.key === cat) || {}).label || "";
+  const ranked = cards
+    .map((c) => ({ card: c, rate: rateFor(c, cat), value: cardValue(c, cat) }))
+    .sort((a, b) => b.value - a.value || b.rate - a.rate);
+  const best = ranked[0];
+  const fmtRate = (r) => (Number.isInteger(r) ? r : r.toFixed(1)) + "×";
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, marginTop: 10, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub }}>WHICH CARD SHOULD I USE FOR…</div>
+        <button onClick={onClose} className="rt-mono" style={{ background: "none", border: "none", color: T.sub, fontSize: 11, textDecoration: "underline" }}>close</button>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {SPEND_CATS.map((s) => (
+          <button key={s.key} onClick={() => setCat(s.key)} aria-pressed={cat === s.key}
+            style={{ fontSize: 12.5, fontWeight: 600, borderRadius: 999, padding: "7px 12px", cursor: "pointer",
+              border: `1px solid ${cat === s.key ? T.text : T.borderSoft}`,
+              background: cat === s.key ? T.inverseBg : "transparent", color: cat === s.key ? T.inverseText : T.text }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {best && (
+        <div style={{ background: best.card.bg, color: best.card.ink, borderRadius: 12, padding: "16px 18px", boxShadow: `0 6px 16px ${T.shadow}` }}>
+          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, opacity: .8 }}>BEST FOR {label.toUpperCase()}{best.card.p2 ? " · P2" : ""}</div>
+          <div style={{ fontWeight: 700, fontSize: 20, marginTop: 4, lineHeight: 1.15 }}>{best.card.displayName}</div>
+          <div className="rt-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+            {fmtRate(best.rate)} points · ≈ {best.value.toFixed(1)}¢ back per $1
+          </div>
+        </div>
+      )}
+
+      {ranked.length > 1 && (
+        <div>
+          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub, marginBottom: 6 }}>OTHER CARDS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {ranked.slice(1, 5).map((r) => (
+              <div key={r.card.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: T.surfaceAlt, border: `1px solid ${T.border}`, borderLeft: `4px solid ${r.card.accent}`, borderRadius: 10, padding: "9px 12px" }}>
+                <span style={{ fontWeight: 600, fontSize: 13, minWidth: 0 }}>{r.card.displayName}{r.card.p2 && <span className="rt-mono" style={{ fontSize: 8, letterSpacing: 1, color: T.amberText, marginLeft: 6 }}>P2</span>}</span>
+                <span className="rt-mono" style={{ fontSize: 12, color: T.sub, flex: "0 0 auto" }}>{fmtRate(r.rate)} · ≈{r.value.toFixed(1)}¢</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p style={{ fontSize: 11, color: T.faint, lineHeight: 1.5, margin: 0 }}>
+        Ranked by estimated value per $1 spent — the card's earn rate for {label.toLowerCase()} multiplied by a typical value for its points/miles. Point values are estimates; your real value depends on how you redeem.
+      </p>
     </div>
   );
 }
@@ -1333,8 +1481,8 @@ function CardDetailPanel({ T, card, benefits, onClose }) {
     <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `4px solid ${card.accent}`, borderRadius: 12, padding: 16, marginTop: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub }}>{(card.issuer || "").toUpperCase()}</div>
-          <div className="rt-serif" style={{ fontSize: 26, lineHeight: 1.05, marginTop: 2 }}>{card.name}</div>
+          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub }}>{(card.issuer || "").toUpperCase()}{card.p2 ? " · P2" : ""}</div>
+          <div className="rt-serif" style={{ fontSize: 26, lineHeight: 1.05, marginTop: 2 }}>{card.displayName || card.name}</div>
         </div>
         <button onClick={onClose} className="rt-mono" style={{ background: "none", border: "none", color: T.sub, fontSize: 11, textDecoration: "underline", flex: "0 0 auto" }}>close</button>
       </div>
@@ -1503,41 +1651,55 @@ function AddPanel({ T, cards, filter, onAdd, onCancel }) {
 }
 
 /* ————— Add card: catalog picker (with custom-card fallback) ————— */
-function AddCardPanel({ T, existingNames, onAddCatalog, onAdd, onCancel }) {
+function AddCardPanel({ T, ownedCounts, onAddCatalog, onAdd, onCancel }) {
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState(false);
+  const [forP2, setForP2] = useState(false);
   const inp = { width: "100%", border: `1px solid ${T.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 14, background: T.surfaceAlt, color: T.text };
-  if (custom) return <CustomCardForm T={T} onAdd={onAdd} onCancel={() => setCustom(false)} />;
+  if (custom) return <CustomCardForm T={T} p2={forP2} onAdd={onAdd} onCancel={() => setCustom(false)} />;
   const q = query.trim().toLowerCase();
   const groups = CARD_CATALOG.map((g) => ({
     group: g.group,
-    items: g.items.filter((it) => !existingNames.has(it.name.toLowerCase()) && (!q || it.name.toLowerCase().includes(q) || it.issuer.toLowerCase().includes(q))),
+    items: g.items.filter((it) => !q || it.name.toLowerCase().includes(q) || it.issuer.toLowerCase().includes(q)),
   })).filter((g) => g.items.length);
+  const seg = (on) => ({ flex: 1, textAlign: "center", padding: "7px 4px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer",
+    background: on ? T.inverseBg : "transparent", color: on ? T.inverseText : T.sub, border: "none" });
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "grid", gap: 10, marginTop: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub }}>ADD A CARD · PICK FROM THE LIST</div>
-        <button onClick={onCancel} className="rt-mono" style={{ background: "none", border: "none", color: T.sub, fontSize: 11, textDecoration: "underline" }}>close</button>
+        <button onClick={onCancel} className="rt-mono" style={{ background: "none", border: "none", color: T.sub, fontSize: 11, textDecoration: "underline" }}>done</button>
+      </div>
+      {/* Whose card is this? */}
+      <div>
+        <label className="rt-mono" style={{ fontSize: 10, letterSpacing: 1.5, color: T.sub, display: "block", marginBottom: 4 }}>ADDING FOR</label>
+        <div style={{ display: "flex", gap: 4, background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 10, padding: 3 }}>
+          <button style={seg(!forP2)} onClick={() => setForP2(false)}>My card</button>
+          <button style={seg(forP2)} onClick={() => setForP2(true)}>P2's card</button>
+        </div>
       </div>
       <input style={inp} value={query} placeholder="Search cards or issuers (e.g. United, Hilton, Venture X)…" onChange={(e) => setQuery(e.target.value)} />
-      <div style={{ maxHeight: 420, overflowY: "auto", display: "grid", gap: 4, margin: "0 -4px", padding: "0 4px" }}>
+      <div style={{ maxHeight: 400, overflowY: "auto", display: "grid", gap: 4, margin: "0 -4px", padding: "0 4px" }}>
         {groups.length === 0 && <div style={{ fontSize: 13, color: T.sub, padding: "12px 2px" }}>No matches. Try another search, or create a custom card below.</div>}
         {groups.map((g) => (
           <div key={g.group}>
             <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub, padding: "12px 2px 6px" }}>{g.group.toUpperCase()}</div>
             <div style={{ display: "grid", gap: 6 }}>
-              {g.items.map((it) => (
-                <button key={it.name} onClick={() => onAddCatalog(it)}
-                  style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 10, alignItems: "center", textAlign: "left",
-                    background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px" }}>
-                  <span style={{ width: 30, height: 20, borderRadius: 4, background: it.bg, flex: "0 0 auto", boxShadow: `0 0 0 1px ${T.border}` }} />
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: "block", fontWeight: 600, fontSize: 13.5, lineHeight: 1.2 }}>{it.name}</span>
-                    <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1, color: T.sub }}>{it.issuer.toUpperCase()}</span>
-                  </span>
-                  <span className="rt-mono" style={{ fontSize: 11, color: T.sub, flex: "0 0 auto" }}>{it.fee > 0 ? money(it.fee) + "/yr" : "NO FEE"}</span>
-                </button>
-              ))}
+              {g.items.map((it) => {
+                const owned = ownedCounts[it.name.toLowerCase()] || 0;
+                return (
+                  <button key={it.name} onClick={() => onAddCatalog(it, g.group, forP2)}
+                    style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 10, alignItems: "center", textAlign: "left",
+                      background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px" }}>
+                    <span style={{ width: 30, height: 20, borderRadius: 4, background: it.bg, flex: "0 0 auto", boxShadow: `0 0 0 1px ${T.border}` }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontWeight: 600, fontSize: 13.5, lineHeight: 1.2 }}>{it.name}{owned > 0 && <span className="rt-mono" style={{ fontSize: 9, color: T.green, marginLeft: 6 }}>✓ {owned} in wallet</span>}</span>
+                      <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1, color: T.sub }}>{it.issuer.toUpperCase()}</span>
+                    </span>
+                    <span className="rt-mono" style={{ fontSize: 11, color: T.sub, flex: "0 0 auto" }}>{it.fee > 0 ? money(it.fee) + "/yr" : "NO FEE"}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -1547,14 +1709,14 @@ function AddCardPanel({ T, existingNames, onAddCatalog, onAdd, onCancel }) {
         ＋ Create a custom card instead
       </button>
       <p style={{ fontSize: 11, color: T.faint, lineHeight: 1.5, margin: 0 }}>
-        Fees, earning rates, and credits are pre-filled from published terms as of mid-2026 — everything is editable after you add a card, and the renewal month defaults to January until you set it under manage cards.
+        Tap a card to add it — the list stays open so you can add several (all of P2's, or two of the same business card). Tap <strong>done</strong> when finished. Everything is editable afterward under manage cards.
       </p>
     </div>
   );
 }
 
 /* ————— Custom card form ————— */
-function CustomCardForm({ T, onAdd, onCancel }) {
+function CustomCardForm({ T, p2, onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [issuer, setIssuer] = useState("");
   const [fee, setFee] = useState(0);
@@ -1606,7 +1768,7 @@ function CustomCardForm({ T, onAdd, onCancel }) {
       )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         <button onClick={onCancel} style={{ background: "none", border: `1px solid ${T.borderSoft}`, borderRadius: 999, padding: "8px 16px", fontSize: 13, color: T.text }}>Cancel</button>
-        <button disabled={!name} onClick={() => onAdd({ name, issuer, fee, annualMonth, earn: (earn || "SET TOP EARN CATEGORY").toUpperCase(), bg: finish.bg, ink: finish.ink, accent: finish.accent })}
+        <button disabled={!name} onClick={() => onAdd({ name, issuer, fee, annualMonth, earn: (earn || "SET TOP EARN CATEGORY").toUpperCase(), bg: finish.bg, ink: finish.ink, accent: finish.accent, p2: !!p2 })}
           style={{ background: T.inverseBg, color: T.inverseText, border: "none", borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 600, opacity: name ? 1 : .4 }}>Add card</button>
       </div>
     </div>
