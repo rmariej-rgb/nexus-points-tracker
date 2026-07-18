@@ -62,27 +62,28 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 // annualMonth is 0-indexed (0 = January). These are placeholders — set each
 // card's real renewal month in "Manage cards" so reminders fire on time.
 const CARDS = [
+  // Colors chosen to resemble each card's real-life design.
   { id: "gold", name: "Amex Gold", issuer: "American Express", fee: 325, annualMonth: 4,
     earn: "4x DINING · 4x U.S. SUPERMARKETS",
-    bg: "linear-gradient(120deg,#EAD9A8 0%,#CDA95C 45%,#A98737 100%)", ink: "#3A2E10", accent: "#A98737" },
+    bg: "linear-gradient(135deg,#E7D8A6 0%,#CBA85C 45%,#A6832F 100%)", ink: "#3A2E10", accent: "#A6832F" }, // gold
   { id: "plat", name: "Amex Platinum", issuer: "American Express", fee: 895, annualMonth: 0,
     earn: "5x FLIGHTS (AIRLINE DIRECT / AMEX TRAVEL)",
-    bg: "linear-gradient(120deg,#EFF0F2 0%,#C9CCD1 50%,#A9ADB4 100%)", ink: "#2A2D33", accent: "#8B909A" },
+    bg: "linear-gradient(135deg,#EDEFF2 0%,#C9CDD3 50%,#A7ACB4 100%)", ink: "#2A2D33", accent: "#8A9099" }, // platinum silver
   { id: "csp", name: "Sapphire Preferred", issuer: "Chase", fee: 95, annualMonth: 10,
     earn: "3x DINING · GAS · VACATION RENTALS",
-    bg: "linear-gradient(120deg,#27476E 0%,#1B3050 55%,#12213A 100%)", ink: "#DCE6F4", accent: "#2E5486" },
+    bg: "linear-gradient(135deg,#3A66B0 0%,#284E8E 55%,#183463 100%)", ink: "#EAF0FA", accent: "#3A66B0" }, // sapphire blue
   { id: "cibp", name: "Ink Business Preferred", issuer: "Chase", fee: 95, annualMonth: 7,
     earn: "3x TRAVEL · SHIPPING · ADS · INTERNET",
-    bg: "linear-gradient(120deg,#2B2E34 0%,#1B1D21 60%,#111317 100%)", ink: "#D8DADE", accent: "#3D4149" },
+    bg: "linear-gradient(135deg,#1E3352 0%,#152740 55%,#0D1A2E 100%)", ink: "#D6DEEA", accent: "#29456F" }, // ink navy
   { id: "citi-exec", name: "AAdvantage Executive World Elite", issuer: "Citi / American Airlines", fee: 595, annualMonth: 2,
     earn: "4x AMERICAN AIRLINES PURCHASES",
-    bg: "linear-gradient(120deg,#43474E 0%,#2C2F35 55%,#1E2126 100%)", ink: "#E4E6E9", accent: "#B4232A" },
+    bg: "linear-gradient(135deg,#45494F 0%,#2C2F34 55%,#1B1D21 100%)", ink: "#E7E9EC", accent: "#B4232A" }, // dark metal, AA red
   { id: "citi-plat", name: "AAdvantage Platinum Select World Elite", issuer: "Citi / American Airlines", fee: 99, annualMonth: 6,
     earn: "2x AMERICAN AIRLINES · RESTAURANTS · GAS",
-    bg: "linear-gradient(120deg,#8B4513 0%,#5C2E0A 55%,#3D1F05 100%)", ink: "#F5DEB3", accent: "#CD853F" },
+    bg: "linear-gradient(135deg,#9BA7B5 0%,#6F7D8D 50%,#4D5866 100%)", ink: "#1B2430", accent: "#46607E" }, // steel silver-blue
   { id: "cap-venture", name: "Venture Rewards", issuer: "Capital One", fee: 95, annualMonth: 5,
     earn: "2x ALL PURCHASES (unlimited)",
-    bg: "linear-gradient(120deg,#D4433B 0%,#A0332F 55%,#6B2226 100%)", ink: "#FFF5E6", accent: "#F0AD4E" },
+    bg: "linear-gradient(135deg,#26406B 0%,#1A2F52 55%,#101F38 100%)", ink: "#EAF0F8", accent: "#C8102E" }, // navy, Capital One red
 ];
 
 const FINISHES = [
@@ -360,6 +361,27 @@ export default function RewardsTracker() {
       .sort((a, b) => (a.daysLeft ?? 99999) - (b.daysLeft ?? 99999));
   }, [now, activeCards]);
 
+  // To-do by time: only credits NOT yet fully used this period, grouped by how
+  // often they reset (soonest to lapse first). Checking one off drops it here.
+  const TODO_ORDER = ["monthly", "quarterly", "semiannual", "annual"];
+  const TODO_LABELS = { monthly: "This month", quarterly: "This quarter", semiannual: "This half-year", annual: "This year" };
+  const todo = useMemo(() => {
+    const buckets = { monthly: [], quarterly: [], semiannual: [], annual: [] };
+    benefits.forEach((b) => {
+      if (!activeIds.has(b.cardId) || b.amount <= 0 || b.freq === "multiyear") return;
+      const key = periodKey(b.freq, now);
+      const used = usage[b.id]?.[key] || 0;
+      const remaining = Math.max(0, b.amount - used);
+      if (remaining <= 0) return; // already checked off → not a to-do
+      const end = periodEnd(b.freq, now);
+      if (buckets[b.freq]) buckets[b.freq].push({ ...b, key, remaining, end, dLeft: daysLeft(end) });
+    });
+    TODO_ORDER.forEach((f) => buckets[f].sort((a, z) => (a.dLeft - z.dLeft) || (z.remaining - a.remaining)));
+    return buckets;
+  }, [benefits, usage, activeIds]);
+  const todoCount = TODO_ORDER.reduce((s, f) => s + todo[f].length, 0);
+  const todoTotal = TODO_ORDER.reduce((s, f) => s + todo[f].reduce((t, i) => t + i.remaining, 0), 0);
+
   const atStake = useMemo(() =>
     benefits.reduce((sum, b) => {
       if (b.freq === "multiyear" || !activeIds.has(b.cardId)) return sum;
@@ -497,7 +519,7 @@ export default function RewardsTracker() {
 
         {/* Tabs */}
         <nav style={{ display: "flex", gap: 6, margin: "20px 0 14px", flexWrap: "wrap" }} role="tablist">
-          {[["benefits", "Deadlines"], ["scorecard", "Fee scorecard"], ["points", "Points & miles"]].map(([id, label]) => (
+          {[["benefits", "Deadlines"], ["todo", "To-do"], ["scorecard", "Fee scorecard"], ["points", "Points & miles"]].map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               style={{
                 border: `1px solid ${T.text}`, borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 600,
@@ -609,6 +631,67 @@ export default function RewardsTracker() {
 
             <p style={{ fontSize: 11, color: T.faint, marginTop: 18, lineHeight: 1.5 }}>
               Amounts are pre-filled from published card terms as of mid-2026 but issuers change them often — tap "edit" on any row to correct values, and verify against your own benefit terms. Anniversary-based credits (like the Sapphire hotel credit) are tracked here on a calendar year; adjust to your renewal month if it differs. Set each card's real fee amount and renewal month under <strong>⚙ manage cards</strong> so reminders land on time.
+            </p>
+          </section>
+        )}
+
+        {tab === "todo" && (
+          <section aria-label="To-do by time">
+            <div className="rt-mono" style={{ background: T.inverseBg, color: T.inverseText, borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+              <span style={{ fontSize: 11, letterSpacing: 2 }}>{todoCount === 0 ? "NOTHING PENDING" : `${todoCount} TO USE`}</span>
+              <span style={{ fontSize: 24, fontWeight: 600 }}>{money(todoTotal)}</span>
+            </div>
+
+            {todoCount === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: T.sub }}>
+                <div className="rt-serif" style={{ fontSize: 28 }}>All caught up.</div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>Every active credit for the current period is checked off. Nice.</div>
+              </div>
+            ) : (
+              TODO_ORDER.map((f) => {
+                const items = todo[f];
+                if (!items.length) return null;
+                const bucketSum = items.reduce((t, i) => t + i.remaining, 0);
+                return (
+                  <div key={f} style={{ marginBottom: 18 }}>
+                    <div className="rt-mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 4px 8px", fontSize: 10, letterSpacing: 2, color: T.sub }}>
+                      <span>{TODO_LABELS[f].toUpperCase()} · {items.length}</span>
+                      <span>{money(bucketSum)} LEFT</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {items.map((item, i) => {
+                        const c = cardOf(item.cardId);
+                        const urgent = item.dLeft !== null && item.dLeft <= 7;
+                        const soon = item.dLeft !== null && item.dLeft <= 21 && !urgent;
+                        return (
+                          <div key={item.id} className="rt-row" style={{ animationDelay: `${i * 25}ms`, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, borderLeft: `4px solid ${c.accent}`, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 12, alignItems: "center", padding: "12px 14px" }}>
+                            <button onClick={() => setUsed(item, item.amount)} aria-label={`Mark ${item.name} used`}
+                              title="Mark used"
+                              style={{ width: 26, height: 26, borderRadius: 999, border: `2px solid ${urgent ? T.red : T.borderSoft}`, background: "transparent", display: "grid", placeItems: "center", flex: "0 0 auto", color: T.sub, fontSize: 13 }}>
+                              ○
+                            </button>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, background: c.accent, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{c.name.toUpperCase()}</span>
+                              </div>
+                              <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>
+                                <span className="rt-mono">{money(item.remaining)} · </span>{item.name}
+                              </div>
+                            </div>
+                            <div className="rt-mono" style={{ textAlign: "right", fontSize: 12, color: urgent ? T.red : T.text }}>
+                              <div style={{ fontWeight: 600 }}>{fmtDate(item.end)}</div>
+                              {item.dLeft !== null && <div style={{ fontSize: 10, color: urgent ? T.red : soon ? T.amber : T.sub }}>{item.dLeft}d left</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <p style={{ fontSize: 11, color: T.faint, marginTop: 8, lineHeight: 1.5 }}>
+              Only credits you haven't fully used yet show here, soonest to reset first. Tap the circle to check one off — it drops from this list and is marked used on the Deadlines tab too. Recurring perks (lounge access, phone protection) aren't listed since there's nothing to "use up."
             </p>
           </section>
         )}
@@ -748,11 +831,10 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
                   style={{ background: "none", border: "none", color: T.red, fontSize: 10, textDecoration: "underline", flex: "0 0 auto" }}>remove</button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8, opacity: c.enabled ? 1 : .5 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "end", opacity: c.enabled ? 1 : .5 }}>
               <div>
-                <label className="rt-mono" style={lbl}>ANNUAL FEE ($)</label>
-                <input style={inp} type="number" min="0" value={c.fee ?? 0} disabled={!c.enabled}
-                  onChange={(e) => onUpdate(c.id, { fee: Number(e.target.value) || 0 })} />
+                <label className="rt-mono" style={lbl}>ANNUAL FEE</label>
+                <div className="rt-mono" style={{ fontSize: 15, fontWeight: 600, padding: "6px 2px" }}>{money(c.fee)}</div>
               </div>
               <div>
                 <label className="rt-mono" style={lbl}>FEE POSTS IN</label>
