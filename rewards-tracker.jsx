@@ -140,7 +140,7 @@ const DEFAULT_BENEFITS = [
 const DEFAULT_POINTS = [
   { id: "amex", name: "Amex Membership Rewards", cards: "Gold + Platinum", balance: 470000, cpp: 2.0 },
   { id: "chase", name: "Chase Ultimate Rewards", cards: "Sapphire Preferred + Ink Preferred", balance: 77000, cpp: 2.05 },
-  { id: "p2chase", name: "P2's Chase Ultimate Rewards", cards: "P2 · estimated", balance: 60000, cpp: 2.05 },
+  { id: "p2chase", name: "P2's Chase Ultimate Rewards", cards: "P2 · estimated", balance: 60000, cpp: 2.05, p2: true },
   { id: "capone", name: "Capital One Miles", cards: "Venture Rewards", balance: 0, cpp: 1.85 },
   { id: "aa", name: "American AAdvantage", cards: "Citi Executive + Platinum Select", balance: 70000, cpp: 1.5 },
   { id: "delta", name: "Delta SkyMiles", cards: "Airline program", balance: 13000, cpp: 1.2 },
@@ -267,6 +267,10 @@ export default function RewardsTracker() {
   const [customCards, setCustomCards] = useState([]);
   // Per-card overrides: { [cardId]: { enabled?, fee?, annualMonth? } }
   const [cardSettings, setCardSettings] = useState({});
+  // Auto-charge bookkeeping: { [benefitId]: last period key we auto-checked }
+  const [autoStamp, setAutoStamp] = useState({});
+  const [editingPoint, setEditingPoint] = useState(null);
+  const [showP2, setShowP2] = useState(true);
   const [mode, setMode] = useState("light");
   const saveTimer = useRef(null);
   const T = THEMES[mode];
@@ -302,12 +306,9 @@ export default function RewardsTracker() {
           if (data.theme) setMode(data.theme);
           if (data.customCards) setCustomCards(data.customCards);
           if (data.cardSettings) setCardSettings(data.cardSettings);
-          if (data.points) {
-            setPoints(DEFAULT_POINTS.map((def) => {
-              const saved = data.points.find((p) => p.id === def.id);
-              return saved && saved.balance > 0 ? { ...def, balance: saved.balance } : def;
-            }));
-          }
+          if (data.autoStamp) setAutoStamp(data.autoStamp);
+          if (typeof data.showP2 === "boolean") setShowP2(data.showP2);
+          if (Array.isArray(data.points) && data.points.length) setPoints(data.points);
         }
       } catch (e) { /* first run — defaults are fine */ }
       setLoaded(true);
@@ -319,11 +320,33 @@ export default function RewardsTracker() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
-        await window.storage.set(STORAGE_KEY, JSON.stringify({ benefits, usage, points, theme: mode, customCards, cardSettings }));
+        await window.storage.set(STORAGE_KEY, JSON.stringify({ benefits, usage, points, theme: mode, customCards, cardSettings, autoStamp, showP2 }));
       } catch (e) { console.error("Save failed", e); }
     }, 400);
     return () => clearTimeout(saveTimer.current);
-  }, [benefits, usage, points, mode, customCards, cardSettings, loaded]);
+  }, [benefits, usage, points, mode, customCards, cardSettings, autoStamp, showP2, loaded]);
+
+  // Auto-charge: for benefits marked auto, tick off the current period once, at
+  // the start of each new period. The user can still manually untick it afterward
+  // (we only auto-apply once per period, tracked by autoStamp), and turning auto
+  // off stops future auto-ticks.
+  useEffect(() => {
+    if (!loaded) return;
+    const pending = benefits.filter(
+      (b) => b.auto && b.freq !== "multiyear" && b.amount > 0 && autoStamp[b.id] !== periodKey(b.freq, now)
+    );
+    if (!pending.length) return;
+    setUsage((u) => {
+      const n = { ...u };
+      pending.forEach((b) => { const k = periodKey(b.freq, now); n[b.id] = { ...(n[b.id] || {}), [k]: b.amount }; });
+      return n;
+    });
+    setAutoStamp((s) => {
+      const n = { ...s };
+      pending.forEach((b) => { n[b.id] = periodKey(b.freq, now); });
+      return n;
+    });
+  }, [loaded, benefits, autoStamp]);
 
   // Keep real iOS reminders in sync whenever cards / fees / months change.
   useEffect(() => {
@@ -392,7 +415,30 @@ export default function RewardsTracker() {
   const setUsed = (b, amt) =>
     setUsage((u) => ({ ...u, [b.id]: { ...(u[b.id] || {}), [b.key]: amt } }));
 
+  // Turn auto-charge on/off for a benefit. Turning it on immediately checks off
+  // the current period; turning it off just stops future auto-ticks.
+  const setAuto = (b, value) => {
+    setBenefits((bs) => bs.map((x) => x.id === b.id ? { ...x, auto: value } : x));
+    if (value && b.freq !== "multiyear" && b.amount > 0) {
+      const k = periodKey(b.freq, now);
+      setUsage((u) => ({ ...u, [b.id]: { ...(u[b.id] || {}), [k]: b.amount } }));
+      setAutoStamp((s) => ({ ...s, [b.id]: k }));
+    }
+  };
+
   const cardOf = (id) => allCards.find((c) => c.id === id) || applySettings(CARDS[0]);
+
+  // Points & miles editing
+  const updatePoint = (id, patch) => setPoints((ps) => ps.map((p) => p.id === id ? { ...p, ...patch } : p));
+  const addPoint = () => {
+    const id = "pt" + Date.now();
+    setPoints((ps) => [...ps, { id, name: "New program", cards: "", balance: 0, cpp: 1.0, p2: false }]);
+    setEditingPoint(id);
+  };
+  const removePoint = (id) => setPoints((ps) => ps.filter((p) => p.id !== id));
+  const lblP = { fontSize: 10, letterSpacing: 1.5, color: T.sub, display: "block", marginBottom: 4 };
+  const inpP = { width: "100%", border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, background: T.surfaceAlt, color: T.text };
+  const visiblePoints = points.filter((p) => showP2 || !p.p2);
 
   const updateCardSetting = (id, patch) =>
     setCardSettings((s) => ({ ...s, [id]: { ...(s[id] || {}), ...patch } }));
@@ -518,11 +564,12 @@ export default function RewardsTracker() {
         )}
 
         {/* Tabs */}
-        <nav style={{ display: "flex", gap: 6, margin: "20px 0 14px", flexWrap: "wrap" }} role="tablist">
-          {[["benefits", "Deadlines"], ["todo", "To-do"], ["scorecard", "Fee scorecard"], ["points", "Points & miles"]].map(([id, label]) => (
+        <nav style={{ display: "flex", gap: 6, margin: "20px 0 14px" }} role="tablist">
+          {[["benefits", "Deadlines"], ["todo", "To-do"], ["scorecard", "Scorecard"], ["points", "Points"]].map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               style={{
-                border: `1px solid ${T.text}`, borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 600,
+                flex: 1, border: `1px solid ${T.text}`, borderRadius: 999, padding: "8px 6px", fontSize: 12.5, fontWeight: 600,
+                whiteSpace: "nowrap", textAlign: "center",
                 background: tab === id ? T.inverseBg : "transparent", color: tab === id ? T.inverseText : T.text,
               }}>{label}</button>
           ))}
@@ -571,6 +618,7 @@ export default function RewardsTracker() {
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                           <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, background: c.accent, color: "#fff", borderRadius: 4, padding: "2px 6px" }}>{c.name.toUpperCase()}</span>
                           <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, color: T.sub }}>{FREQ[b.freq].label.toUpperCase()}</span>
+                          {b.auto && <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, color: T.green, border: `1px solid ${T.green}`, borderRadius: 4, padding: "1px 5px" }}>⟳ AUTO</span>}
                         </div>
                         <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4, textDecoration: done ? "line-through" : "none" }}>
                           {b.amount > 0 && <span className="rt-mono">{money(b.amount)} · </span>}{b.name}
@@ -609,6 +657,7 @@ export default function RewardsTracker() {
                         onSetPeriod={(key, amt) => setUsage((u) => ({ ...u, [b.id]: { ...(u[b.id] || {}), [key]: amt } }))}
                         onSave={(patch) => { setBenefits((bs) => bs.map((x) => x.id === b.id ? { ...x, ...patch } : x)); setEditing(null); }}
                         onUsed={(amt) => setUsed(b, amt)}
+                        onSetAuto={(v) => setAuto(b, v)}
                         onDelete={() => { setBenefits((bs) => bs.filter((x) => x.id !== b.id)); setEditing(null); }}
                       />
                     )}
@@ -750,34 +799,87 @@ export default function RewardsTracker() {
               <div style={{ marginTop: 4 }}>Chase Ultimate Rewards transfers to World of Hyatt drop from 1:1 to 4:3 on Oct 1, 2026 for Sapphire Preferred and Ink Preferred. If you have a Hyatt redemption planned, transfer before then.</div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {points.map((p) => (
-                <div key={p.id} style={{ background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
-                    <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 1.5, color: T.sub, marginTop: 2 }}>{p.cards.toUpperCase()}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <input
-                      className="rt-mono" type="number" min="0" value={p.balance}
-                      aria-label={`${p.name} balance`}
-                      onChange={(e) => setPoints((ps) => ps.map((x) => x.id === p.id ? { ...x, balance: Number(e.target.value) || 0 } : x))}
-                      style={{ width: 130, fontSize: 18, fontWeight: 600, textAlign: "right", border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 8px", background: T.surfaceAlt, color: T.text }}
-                    />
-                    <div className="rt-mono" style={{ fontSize: 10, color: T.sub, marginTop: 3 }}>
-                      ≈ {money(p.balance * p.cpp / 100)} at {p.cpp}¢/pt
-                    </div>
-                  </div>
+            {/* Toggle to include/exclude partner (P2) accounts */}
+            {points.some((p) => p.p2) && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>Include P2's accounts</div>
+                  <div style={{ fontSize: 12, color: T.sub, marginTop: 2 }}>Show your partner's balances in the list and the total.</div>
                 </div>
-              ))}
+                <Toggle T={T} on={showP2} onChange={setShowP2} label="P2 accounts" />
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {visiblePoints.map((p) => {
+                const isEdit = editingPoint === p.id;
+                return (
+                  <div key={p.id} style={{ background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          {p.name}
+                          {p.p2 && <span className="rt-mono" style={{ fontSize: 9, letterSpacing: 1.5, color: T.amberText, background: T.amberBg, border: `1px solid ${T.amberBorder}`, borderRadius: 4, padding: "1px 5px" }}>P2</span>}
+                        </div>
+                        {p.cards && <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 1.5, color: T.sub, marginTop: 2 }}>{p.cards.toUpperCase()}</div>}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <input
+                          className="rt-mono" type="number" min="0" value={p.balance}
+                          aria-label={`${p.name} balance`}
+                          onChange={(e) => updatePoint(p.id, { balance: Number(e.target.value) || 0 })}
+                          style={{ width: 130, fontSize: 18, fontWeight: 600, textAlign: "right", border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 8px", background: T.surfaceAlt, color: T.text }}
+                        />
+                        <div className="rt-mono" style={{ fontSize: 10, color: T.sub, marginTop: 3 }}>
+                          ≈ {money(p.balance * p.cpp / 100)} at {p.cpp}¢/pt
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 6, textAlign: "right" }}>
+                      <button onClick={() => setEditingPoint(isEdit ? null : p.id)}
+                        style={{ background: "none", border: "none", fontSize: 11, color: T.sub, textDecoration: "underline", padding: 0 }}>
+                        {isEdit ? "close" : "edit"}
+                      </button>
+                    </div>
+                    {isEdit && (
+                      <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 8, paddingTop: 12, display: "grid", gap: 10 }}>
+                        <div><label className="rt-mono" style={lblP}>PROGRAM NAME</label>
+                          <input style={inpP} value={p.name} onChange={(e) => updatePoint(p.id, { name: e.target.value })} /></div>
+                        <div><label className="rt-mono" style={lblP}>SUBTITLE (CARDS / SOURCE)</label>
+                          <input style={inpP} value={p.cards} placeholder="e.g. Gold + Platinum" onChange={(e) => updatePoint(p.id, { cards: e.target.value })} /></div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div><label className="rt-mono" style={lblP}>VALUE (¢ / POINT)</label>
+                            <input style={inpP} type="number" min="0" step="0.05" value={p.cpp} onChange={(e) => updatePoint(p.id, { cpp: Number(e.target.value) || 0 })} /></div>
+                          <div>
+                            <label className="rt-mono" style={lblP}>PARTNER (P2)</label>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px", background: T.surfaceAlt }}>
+                              <span className="rt-mono" style={{ fontSize: 11, color: T.sub }}>P2's account</span>
+                              <Toggle T={T} on={!!p.p2} onChange={(v) => updatePoint(p.id, { p2: v })} label="P2 account" />
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <button onClick={() => { removePoint(p.id); setEditingPoint(null); }}
+                            style={{ background: "none", border: "none", color: T.red, fontSize: 12, textDecoration: "underline", padding: 0 }}>Delete program</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+
+            <button onClick={addPoint}
+              style={{ width: "100%", marginTop: 12, padding: 12, borderRadius: 12, border: `1.5px dashed ${T.borderSoft}`, background: "transparent", fontSize: 13, fontWeight: 600, color: T.sub }}>
+              + Add a points or miles program
+            </button>
 
             <div className="rt-mono" style={{ marginTop: 16, background: T.inverseBg, color: T.inverseText, borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 11, letterSpacing: 2 }}>TOTAL ESTIMATED VALUE</span>
-              <span style={{ fontSize: 24, fontWeight: 600 }}>{money(points.reduce((s, p) => s + p.balance * p.cpp / 100, 0))}</span>
+              <span style={{ fontSize: 24, fontWeight: 600 }}>{money(visiblePoints.reduce((s, p) => s + p.balance * p.cpp / 100, 0))}</span>
             </div>
             <p style={{ fontSize: 11, color: T.faint, marginTop: 12, lineHeight: 1.5 }}>
-              Cent-per-point values are common published estimates, not guarantees — your redemption value depends on how you use them. Balances save automatically.
+              Tap <strong>edit</strong> on any program to rename it, set its value per point, mark it as your partner's (P2), or remove it — and use <strong>+ Add</strong> for any program not listed. Cent-per-point values are estimates; everything saves automatically.
             </p>
           </section>
         )}
@@ -855,7 +957,7 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
 }
 
 /* ————— Edit panel ————— */
-function EditPanel({ T, benefit, usageMap, onSetPeriod, onSave, onUsed, onDelete }) {
+function EditPanel({ T, benefit, usageMap, onSetPeriod, onSave, onUsed, onSetAuto, onDelete }) {
   const [name, setName] = useState(benefit.name);
   const [amount, setAmount] = useState(benefit.amount);
   const [freq, setFreq] = useState(benefit.freq);
@@ -897,6 +999,15 @@ function EditPanel({ T, benefit, usageMap, onSetPeriod, onSave, onUsed, onDelete
           <div className="rt-mono" style={{ fontSize: 9, letterSpacing: 1, color: T.faint, marginTop: 6 }}>
             ✓ FULLY USED · ½ PARTIAL (SET EXACT $ BELOW FOR THE CURRENT PERIOD) · OUTLINED = CURRENT
           </div>
+        </div>
+      )}
+      {amount > 0 && freq !== "multiyear" && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: T.surfaceAlt, borderRadius: 8, padding: "10px 12px", border: `1px solid ${T.border}` }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="rt-mono" style={{ fontSize: 11, letterSpacing: 1, fontWeight: 600, color: benefit.auto ? T.green : T.text }}>⟳ AUTO-CHARGE</div>
+            <div style={{ fontSize: 12, color: T.sub, marginTop: 2 }}>Checks itself off automatically at the start of each period — no need to tap it. You can still untick a period by hand.</div>
+          </div>
+          <Toggle T={T} on={!!benefit.auto} onChange={(v) => onSetAuto(v)} label={benefit.name} />
         </div>
       )}
       <div><label className="rt-mono" style={lbl}>NAME</label><input style={inp} value={name} onChange={(e) => setName(e.target.value)} /></div>
