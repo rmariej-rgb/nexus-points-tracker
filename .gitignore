@@ -11,3 +11,10 @@ ios/
 *.log
 .DS_Store
 Thumbs.db
+
+# Never commit signing keys / certificates
+*.pem
+*.p12
+*.mobileprovision
+*.cer
+*.key

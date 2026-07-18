@@ -19,6 +19,8 @@ workflows:
     integrations:
       app_store_connect: Personal   # name of your App Store Connect API key in Codemagic (Team settings → Integrations)
     environment:
+      groups:
+        - signing        # Codemagic variable group holding CERTIFICATE_PRIVATE_KEY (add it in the UI once)
       vars:
         BUNDLE_ID: "com.nexusrewards.app"           # keep in sync with capacitor.config.json
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
@@ -44,14 +46,27 @@ workflows:
           cd ios/App && pod install
       - name: Set up code signing — create the certificate & profile if they don't exist yet
         script: |
-          # --create makes a distribution certificate and an App Store provisioning
-          # profile for this bundle ID if none exist yet (first build for a new app).
+          set -e
+          echo "===== 1. initialize keychain ====="
+          keychain initialize
+          echo "===== 2. fetch/create signing files for $BUNDLE_ID ====="
+          # Our own private key (CERTIFICATE_PRIVATE_KEY env var) is paired with the
+          # distribution certificate, so the fresh build machine has a usable signing
+          # identity. --create makes the certificate + App Store profile if missing,
+          # and reuses them on every later build.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
+            --platform IOS \
+            --certificate-key @env:CERTIFICATE_PRIVATE_KEY \
             --create
-          keychain initialize
+          echo "===== 3. add certificates to keychain ====="
           keychain add-certificates
+          echo "===== 4. apply profiles to the Xcode project ====="
           xcode-project use-profiles
+          echo "===== 5. diagnostics: signing identities present ====="
+          security find-identity -v -p codesigning || true
+          echo "===== 6. diagnostics: provisioning profiles present ====="
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
       - name: Set the build number
         script: |
           cd ios/App
