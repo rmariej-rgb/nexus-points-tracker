@@ -63,26 +63,34 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 // card's real renewal month in "Manage cards" so reminders fire on time.
 const CARDS = [
   // Colors chosen to resemble each card's real-life design.
+  // earnDetails = full list of earning categories, shown on the card details view.
   { id: "gold", name: "Amex Gold", issuer: "American Express", fee: 325, annualMonth: 4,
     earn: "4x DINING · 4x U.S. SUPERMARKETS",
+    earnDetails: ["4x Dining worldwide", "4x U.S. supermarkets (up to $25k/yr)", "3x Flights booked direct or via Amex Travel", "1x Everything else"],
     bg: "linear-gradient(135deg,#E7D8A6 0%,#CBA85C 45%,#A6832F 100%)", ink: "#3A2E10", accent: "#A6832F" }, // gold
   { id: "plat", name: "Amex Platinum", issuer: "American Express", fee: 895, annualMonth: 0,
     earn: "5x FLIGHTS (AIRLINE DIRECT / AMEX TRAVEL)",
+    earnDetails: ["5x Flights booked direct or via Amex Travel (up to $500k/yr)", "5x Prepaid hotels via Amex Travel", "1x Everything else"],
     bg: "linear-gradient(135deg,#EDEFF2 0%,#C9CDD3 50%,#A7ACB4 100%)", ink: "#2A2D33", accent: "#8A9099" }, // platinum silver
   { id: "csp", name: "Sapphire Preferred", issuer: "Chase", fee: 95, annualMonth: 10,
     earn: "3x DINING · GAS · VACATION RENTALS",
+    earnDetails: ["5x Chase Travel", "3x Dining", "3x Online groceries", "3x Select streaming", "2x All other travel", "1x Everything else"],
     bg: "linear-gradient(135deg,#3A66B0 0%,#284E8E 55%,#183463 100%)", ink: "#EAF0FA", accent: "#3A66B0" }, // sapphire blue
   { id: "cibp", name: "Ink Business Preferred", issuer: "Chase", fee: 95, annualMonth: 7,
     earn: "3x TRAVEL · SHIPPING · ADS · INTERNET",
+    earnDetails: ["3x Travel", "3x Shipping", "3x Internet, cable & phone", "3x Advertising (search & social)", "3x applies to first $150k/yr combined", "1x Everything else"],
     bg: "linear-gradient(135deg,#1E3352 0%,#152740 55%,#0D1A2E 100%)", ink: "#D6DEEA", accent: "#29456F" }, // ink navy
   { id: "citi-exec", name: "AAdvantage Executive World Elite", issuer: "Citi / American Airlines", fee: 595, annualMonth: 2,
     earn: "4x AMERICAN AIRLINES PURCHASES",
+    earnDetails: ["4x American Airlines purchases", "1x Everything else"],
     bg: "linear-gradient(135deg,#45494F 0%,#2C2F34 55%,#1B1D21 100%)", ink: "#E7E9EC", accent: "#B4232A" }, // dark metal, AA red
   { id: "citi-plat", name: "AAdvantage Platinum Select World Elite", issuer: "Citi / American Airlines", fee: 99, annualMonth: 6,
     earn: "2x AMERICAN AIRLINES · RESTAURANTS · GAS",
+    earnDetails: ["2x American Airlines purchases", "2x Restaurants", "2x Gas stations", "1x Everything else"],
     bg: "linear-gradient(135deg,#9BA7B5 0%,#6F7D8D 50%,#4D5866 100%)", ink: "#1B2430", accent: "#46607E" }, // steel silver-blue
   { id: "cap-venture", name: "Venture Rewards", issuer: "Capital One", fee: 95, annualMonth: 5,
     earn: "2x ALL PURCHASES (unlimited)",
+    earnDetails: ["5x Hotels & rental cars booked via Capital One Travel", "2x Miles on every other purchase"],
     bg: "linear-gradient(135deg,#26406B 0%,#1A2F52 55%,#101F38 100%)", ink: "#EAF0F8", accent: "#C8102E" }, // navy, Capital One red
 ];
 
@@ -271,6 +279,7 @@ export default function RewardsTracker() {
   const [autoStamp, setAutoStamp] = useState({});
   const [editingPoint, setEditingPoint] = useState(null);
   const [showP2, setShowP2] = useState(true);
+  const [detailCard, setDetailCard] = useState(null); // card id whose full details are open
   const [mode, setMode] = useState("light");
   const saveTimer = useRef(null);
   const T = THEMES[mode];
@@ -358,7 +367,9 @@ export default function RewardsTracker() {
 
   const rows = useMemo(() => {
     return benefits
-      .filter((b) => activeIds.has(b.cardId) && (!filter || b.cardId === filter))
+      // Only credits with a dollar value are checkable here; non-monetary perks
+      // (points multipliers, lounge access, etc.) live on the card details view.
+      .filter((b) => activeIds.has(b.cardId) && b.amount > 0 && (!filter || b.cardId === filter))
       .map((b) => {
         const key = periodKey(b.freq, now);
         const used = usage[b.id]?.[key] || 0;
@@ -496,7 +507,7 @@ export default function RewardsTracker() {
             const cardStake = benefits.filter((b) => b.cardId === c.id && b.freq !== "multiyear")
               .reduce((s, b) => s + Math.max(0, b.amount - (usage[b.id]?.[periodKey(b.freq)] || 0)), 0);
             return (
-              <button key={c.id} onClick={() => setFilter(active ? null : c.id)} aria-pressed={active}
+              <button key={c.id} onClick={() => { setFilter(active ? null : c.id); setDetailCard(null); }} aria-pressed={active}
                 style={{
                   flex: "0 0 auto", width: 196, height: 128, borderRadius: 12, border: "none",
                   background: c.bg, color: c.ink, textAlign: "left", padding: "13px 14px 12px",
@@ -536,7 +547,12 @@ export default function RewardsTracker() {
           </button>
           {filter && (
             <>
-              <button onClick={() => setFilter(null)} className="rt-mono"
+              <button onClick={() => setDetailCard(detailCard === filter ? null : filter)} className="rt-mono"
+                aria-expanded={detailCard === filter}
+                style={{ background: "none", border: "none", fontSize: 11, letterSpacing: 1, color: detailCard === filter ? T.text : T.sub, padding: "4px 2px", textDecoration: "underline" }}>
+                ⓘ card details
+              </button>
+              <button onClick={() => { setFilter(null); setDetailCard(null); }} className="rt-mono"
                 style={{ background: "none", border: "none", fontSize: 11, letterSpacing: 1, color: T.sub, padding: "4px 2px", textDecoration: "underline" }}>
                 ✕ clear filter — show all cards
               </button>
@@ -561,6 +577,10 @@ export default function RewardsTracker() {
         {addingCard && (
           <AddCardPanel T={T} onCancel={() => setAddingCard(false)}
             onAdd={(card) => { setCustomCards((cs) => [...cs, { ...card, id: "card" + Date.now() }]); setAddingCard(false); }} />
+        )}
+
+        {detailCard && (
+          <CardDetailPanel T={T} card={cardOf(detailCard)} benefits={benefits} onClose={() => setDetailCard(null)} />
         )}
 
         {/* Tabs */}
@@ -952,6 +972,79 @@ function ManageCardsPanel({ T, cards, customIds, onClose, onUpdate, onRemove }) 
       <div className="rt-mono" style={{ fontSize: 10, color: T.faint, lineHeight: 1.5, marginTop: 8, letterSpacing: .3 }}>
         You'll get a reminder — a phone notification and an in-app banner — about one month before each included card's fee posts. Cards toggled off are hidden from every tab and won't remind you.
       </div>
+    </div>
+  );
+}
+
+/* ————— Card details (earning categories + every perk) ————— */
+function CardDetailPanel({ T, card, benefits, onClose }) {
+  const credits = benefits.filter((b) => b.cardId === card.id && b.amount > 0);
+  const perks = benefits.filter((b) => b.cardId === card.id && b.amount <= 0);
+  const earnList = card.earnDetails && card.earnDetails.length ? card.earnDetails : (card.earn ? [card.earn] : []);
+  const sec = { fontSize: 10, letterSpacing: 2, color: T.sub, fontWeight: 600, margin: "16px 0 8px" };
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `4px solid ${card.accent}`, borderRadius: 12, padding: 16, marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="rt-mono" style={{ fontSize: 10, letterSpacing: 2, color: T.sub }}>{(card.issuer || "").toUpperCase()}</div>
+          <div className="rt-serif" style={{ fontSize: 26, lineHeight: 1.05, marginTop: 2 }}>{card.name}</div>
+        </div>
+        <button onClick={onClose} className="rt-mono" style={{ background: "none", border: "none", color: T.sub, fontSize: 11, textDecoration: "underline", flex: "0 0 auto" }}>close</button>
+      </div>
+
+      <div className="rt-mono" style={{ display: "flex", gap: 18, marginTop: 10, fontSize: 12, color: T.sub, flexWrap: "wrap" }}>
+        <span>ANNUAL FEE <strong style={{ color: T.text }}>{money(card.fee)}</strong></span>
+        <span>FEE POSTS <strong style={{ color: T.text }}>{card.annualMonth != null ? MONTHS[card.annualMonth] : "—"}</strong></span>
+      </div>
+
+      {earnList.length > 0 && (
+        <>
+          <div className="rt-mono" style={sec}>EARNING CATEGORIES</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {earnList.map((e, i) => (
+              <span key={i} className="rt-mono" style={{ fontSize: 11, background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 999, padding: "5px 10px" }}>{e}</span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {credits.length > 0 && (
+        <>
+          <div className="rt-mono" style={sec}>STATEMENT CREDITS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {credits.map((b) => (
+              <div key={b.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{b.name}</span>
+                  {b.notes && <div style={{ fontSize: 11, color: T.sub, marginTop: 2, lineHeight: 1.4 }}>{b.notes}</div>}
+                </div>
+                <div className="rt-mono" style={{ textAlign: "right", flex: "0 0 auto" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{money(b.amount)}</div>
+                  <div style={{ fontSize: 9, letterSpacing: 1, color: T.sub }}>{FREQ[b.freq].label.toUpperCase()}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {perks.length > 0 && (
+        <>
+          <div className="rt-mono" style={sec}>OTHER PERKS &amp; BENEFITS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {perks.map((b) => (
+              <div key={b.id}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{b.name}</span>
+                {b.notes && <div style={{ fontSize: 11, color: T.sub, marginTop: 2, lineHeight: 1.4 }}>{b.notes}</div>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p style={{ fontSize: 11, color: T.faint, marginTop: 16, lineHeight: 1.5 }}>
+        Earning rates and perks reflect published terms as of mid-2026 — verify against your own card. Only credits with a dollar value show on the Deadlines and To-do tabs; the rest lives here.
+      </p>
     </div>
   );
 }
